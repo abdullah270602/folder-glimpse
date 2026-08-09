@@ -143,6 +143,8 @@ static async Task TestEnumeration()
 
 static Task TestPositioning()
 {
+    Equal(10, AppSettings.Default.PreviewVisibleRows, "default preview shows ten rows");
+    True(AppSettings.Default.PreviewRowHeightDip > 0, "preview row height is positive");
     var work = new PixelRect(0, 0, 1920, 1040);
     var right = PopupPositioner.Place(new PixelRect(100, 100, 300, 140), work, new PixelSize(430, 500));
     Equal(310, right.Left, "uses right side when available");

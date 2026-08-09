@@ -10,6 +10,9 @@
     <SolidColorBrush x:Key="TextBrush" Color="#171717" />
     <SolidColorBrush x:Key="SubtleTextBrush" Color="#666666" />
     <SolidColorBrush x:Key="LineBrush" Color="#18000000" />
+    <SolidColorBrush x:Key="ScrollTrackBrush" Color="#0D000000" />
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#59000000" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#80000000" />
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextBrush}" /></Style>
   </Window.Resources>
   <Border x:Name="RootBorder" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
@@ -33,13 +36,58 @@
       </Grid>
       <Border Grid.Row="1" Background="{DynamicResource LineBrush}" />
       <Grid Grid.Row="2">
-        <ListBox ItemsSource="{Binding Entries}" Background="Transparent" BorderThickness="0" Padding="8,7"
+        <ListBox x:Name="EntryList" ItemsSource="{Binding Entries}" Background="Transparent" BorderThickness="0" Padding="8,7"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+          <ListBox.Resources>
+            <Style TargetType="ScrollBar">
+              <Setter Property="Width" Value="12" />
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ScrollBar">
+                    <Grid Width="12" Background="Transparent">
+                      <Border Width="4" Margin="0,4" HorizontalAlignment="Center"
+                              Background="{DynamicResource ScrollTrackBrush}" CornerRadius="2" />
+                      <Track x:Name="PART_Track" Margin="0,4" IsDirectionReversed="True">
+                        <Track.DecreaseRepeatButton>
+                          <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False" Opacity="0"
+                                        CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                          <Thumb MinHeight="34" Focusable="False">
+                            <Thumb.Template>
+                              <ControlTemplate TargetType="Thumb">
+                                <Border x:Name="ThumbBody" Width="6" HorizontalAlignment="Center"
+                                        Background="{DynamicResource ScrollThumbBrush}" CornerRadius="3" />
+                                <ControlTemplate.Triggers>
+                                  <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ThumbBody" Property="Background" Value="{DynamicResource ScrollThumbHoverBrush}" />
+                                  </Trigger>
+                                  <Trigger Property="IsDragging" Value="True">
+                                    <Setter TargetName="ThumbBody" Property="Background" Value="{DynamicResource TextBrush}" />
+                                  </Trigger>
+                                </ControlTemplate.Triggers>
+                              </ControlTemplate>
+                            </Thumb.Template>
+                          </Thumb>
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                          <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False" Opacity="0"
+                                        CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" />
+                        </Track.IncreaseRepeatButton>
+                      </Track>
+                    </Grid>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.Resources>
           <ListBox.ItemContainerStyle>
             <Style TargetType="ListBoxItem">
               <Setter Property="Focusable" Value="False" /><Setter Property="IsHitTestVisible" Value="False" />
-              <Setter Property="Padding" Value="9,6" /><Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Height" Value="{Binding Tag, RelativeSource={RelativeSource AncestorType=ListBox}}" />
+              <Setter Property="Padding" Value="9,0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" />
               <Setter Property="Template">
                 <Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border Padding="{TemplateBinding Padding}" CornerRadius="5"><ContentPresenter /></Border></ControlTemplate></Setter.Value>
               </Setter>

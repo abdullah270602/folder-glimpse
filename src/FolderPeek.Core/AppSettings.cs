@@ -6,6 +6,8 @@ public sealed record AppSettings(
     int MaxInitialItems,
     double PreviewWidthDip,
     double PreviewMaxHeightDip,
+    int PreviewVisibleRows,
+    double PreviewRowHeightDip,
     bool ShowFileSizes)
 {
     public static AppSettings Default { get; } = new(
@@ -14,5 +16,7 @@ public sealed record AppSettings(
         200,
         430,
         620,
+        10,
+        32,
         true);
 }

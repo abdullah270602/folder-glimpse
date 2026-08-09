@@ -48,14 +48,19 @@ public partial class PreviewWindow : Window
         Resources["TextBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromRgb(23, 23, 23) : System.Windows.Media.Color.FromRgb(244, 244, 244));
         Resources["SubtleTextBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromRgb(102, 102, 102) : System.Windows.Media.Color.FromRgb(181, 181, 181));
         Resources["LineBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromArgb(24, 0, 0, 0) : System.Windows.Media.Color.FromArgb(32, 255, 255, 255));
+        Resources["ScrollTrackBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromArgb(18, 0, 0, 0) : System.Windows.Media.Color.FromArgb(22, 255, 255, 255));
+        Resources["ScrollThumbBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromArgb(92, 0, 0, 0) : System.Windows.Media.Color.FromArgb(112, 255, 255, 255));
+        Resources["ScrollThumbHoverBrush"] = new SolidColorBrush(light ? System.Windows.Media.Color.FromArgb(132, 0, 0, 0) : System.Windows.Media.Color.FromArgb(168, 255, 255, 255));
         Background = (System.Windows.Media.Brush)Resources["PanelBrush"];
     }
 
-    internal void ShowBeside(PixelRect anchor, double widthDip, double maxHeightDip)
+    internal void ShowBeside(PixelRect anchor, double widthDip, double maxHeightDip, int visibleRows, double rowHeightDip)
     {
         ApplySystemTheme();
         Width = widthDip;
         MaxHeight = maxHeightDip;
+        EntryList.Tag = rowHeightDip;
+        EntryList.MaxHeight = (Math.Max(1, visibleRows) * rowHeightDip) + EntryList.Padding.Top + EntryList.Padding.Bottom;
         SizeToContent = SizeToContent.Height;
         Show();
         UpdateLayout();

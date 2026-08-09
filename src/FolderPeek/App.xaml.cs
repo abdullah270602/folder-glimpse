@@ -130,7 +130,8 @@ public partial class App : System.Windows.Application
         viewModel.EntriesChanged();
         viewModel.Loading = true;
         viewModel.Status = "Loading folder…";
-        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), _settings.PreviewWidthDip, _settings.PreviewMaxHeightDip);
+        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), _settings.PreviewWidthDip, _settings.PreviewMaxHeightDip,
+            _settings.PreviewVisibleRows, _settings.PreviewRowHeightDip);
 
         FolderContents contents;
         try { contents = await _inspector.InspectAsync(snapshot.FolderPath, _settings.MaxInitialItems, token); }
@@ -147,7 +148,8 @@ public partial class App : System.Windows.Application
         viewModel.Status = contents.Error is not null ? contents.Error :
             contents.HasMore ? $"{contents.Entries.Count}+ items · showing first {_settings.MaxInitialItems}" :
             $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}";
-        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), _settings.PreviewWidthDip, _settings.PreviewMaxHeightDip);
+        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), _settings.PreviewWidthDip, _settings.PreviewMaxHeightDip,
+            _settings.PreviewVisibleRows, _settings.PreviewRowHeightDip);
         _ = LoadIconsAsync(contents, generation, token);
     }
 

@@ -49,6 +49,7 @@ dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-con
   the hook callback
 - explicit, unit-tested tap/hold state machine
 - cancellable off-UI-thread folder inspection capped at 200 initial items
+- compact ten-row viewport with a rounded theme-aware scrollbar for larger folders
 - native shell icons loaded after names appear, so icon extraction does not delay content
 - per-monitor-V2 physical-pixel positioning and work-area clamping
 - system light/dark color selection and a tray enable/exit menu
