@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System.IO;
 using FolderGlimpse.Core.Settings;
+using FolderGlimpse.Core.Application;
 
 namespace FolderGlimpse.Startup;
 
@@ -19,7 +20,11 @@ internal sealed class RegistryStartupRegistration : IStartupRegistration
 
     public RegistryStartupRegistration()
     {
-        StartupRegistrationMigration.TryMigrate(new RegistryStartupValueStore(), ExecutablePath);
+        var store = new RegistryStartupValueStore();
+        StartupRegistrationMigration.TryMigrate(store, ExecutablePath);
+        var current = store.Read(StartupRegistrationMigration.CurrentValueName);
+        if (StartupCommand.IsPathOnlyFor(current, ExecutablePath))
+            store.Write(StartupRegistrationMigration.CurrentValueName, StartupCommand.Build(ExecutablePath));
     }
 
     public bool IsEnabled
@@ -29,8 +34,8 @@ internal sealed class RegistryStartupRegistration : IStartupRegistration
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(RunPath);
-                var registered = Convert.ToString(key?.GetValue(StartupRegistrationMigration.CurrentValueName))?.Trim().Trim('"');
-                return string.Equals(Path.GetFullPath(registered ?? string.Empty), Path.GetFullPath(ExecutablePath), StringComparison.OrdinalIgnoreCase);
+                var registered = Convert.ToString(key?.GetValue(StartupRegistrationMigration.CurrentValueName));
+                return StartupCommand.IsCanonicalFor(registered, ExecutablePath);
             }
             catch { return false; }
         }
@@ -43,7 +48,7 @@ internal sealed class RegistryStartupRegistration : IStartupRegistration
             using var key = Registry.CurrentUser.CreateSubKey(RunPath, true);
             if (enabled)
             {
-                key.SetValue(StartupRegistrationMigration.CurrentValueName, $"\"{ExecutablePath}\"", RegistryValueKind.String);
+                key.SetValue(StartupRegistrationMigration.CurrentValueName, StartupCommand.Build(ExecutablePath), RegistryValueKind.String);
                 key.DeleteValue(StartupRegistrationMigration.LegacyValueName, false);
             }
             else

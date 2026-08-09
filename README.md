@@ -7,17 +7,31 @@ of a folder directly from File Explorer without navigating into it.
 
 Select a folder, press Space, and glimpse what's inside.
 
-![FolderGlimpse screenshot placeholder](docs/screenshot-placeholder.svg)
+![FolderGlimpse preview](docs/screenshot-placeholder.svg)
+
+## Launch experience
+
+- On the first normal launch, FolderGlimpse shows a short one-page introduction and then
+  opens its Home control center.
+- Later normal launches open the control center on Home. A second launch reuses and brings
+  forward the already-running instance instead of creating another tray icon or input hook.
+- Windows startup uses the explicit `--startup` mode and starts quietly in the tray—no
+  Welcome page, main window, or splash.
+- Closing the control-center window keeps FolderGlimpse running. Reopen it from the tray's
+  **Open FolderGlimpse**, **Settings…**, or **About FolderGlimpse** commands.
+- To fully stop FolderGlimpse, choose **Exit** from the tray menu.
 
 ## Use it
 
-1. Launch `FolderGlimpse.exe`. It stays in the notification area.
+1. Launch `FolderGlimpse.exe`, complete the brief introduction on first run, then leave the
+   control center open or close it to the notification area.
 2. In Windows 11 File Explorer, select exactly one normal local folder in the file list.
 3. Tap **Space** to open a sticky preview. Tap **Space** again or press **Escape** to close.
 4. Hold **Space** for about 200 ms to open a momentary preview; release it to close.
 5. In a sticky preview, click to select, double-click to open, use Ctrl/Shift for multiple
    selection, or right-click for safe Open, Copy path, location, and Properties actions.
-6. Right-click the tray icon for **Settings…**, startup control, temporary disable, About, or Exit.
+6. Right-click the tray icon to open Home, deep-link to Settings or About, control startup,
+   temporarily pause previews, or exit.
 
 Settings are saved automatically in `%LOCALAPPDATA%\FolderGlimpse\settings.json`. You can
 choose light/dark/system theme, popup dimensions and density, visible metadata, hidden
@@ -67,6 +81,9 @@ dotnet publish src/FolderGlimpse/FolderGlimpse.csproj -c Release -r win-x64 --se
 - native shell icons loaded after names appear, so icon extraction does not delay content
 - per-monitor-V2 physical-pixel positioning and work-area clamping
 - live system/light/dark theming, atomic JSON settings, and HKCU launch-at-sign-in control
+- one reusable control-center window with Home, embedded Settings, How to Use, and About;
+  a separate durable first-run state; and lightweight current-user named-pipe activation
+- deterministic launch intent: manual launch opens the shell, while `--startup` remains silent
 - shared Fluent-inspired WPF templates for cards, buttons, toggles, dropdowns, sliders,
   and the same compact scrollbar in Settings and the preview
 - a custom light/dark tray renderer with modern spacing, rounded hover states, accent
@@ -104,7 +121,9 @@ If Explorer integration needs troubleshooting, start FolderGlimpse from PowerShe
 `--allow-injected-input` switch exists only for automated integration testing; normal
 launches continue rejecting injected keyboard events.
 
-Visual QA can render deterministic Settings and preview snapshots with
+Visual QA can render deterministic shell, Welcome, Settings, and preview snapshots with
+`--capture-main=<png> --capture-section=Home|Settings|HowToUse|About`,
+`--capture-welcome=<png>`,
 `--capture-settings=<png>`, `--capture-preview=<png> --preview-folder=<path>`, optional
 `--capture-tray=<png>`, `--capture-theme=Light|Dark`, `--capture-bottom`,
 `--capture-interaction`, and

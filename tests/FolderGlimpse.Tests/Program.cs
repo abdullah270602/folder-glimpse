@@ -1,4 +1,5 @@
 using FolderGlimpse.Core;
+using FolderGlimpse.Core.Application;
 using FolderGlimpse.Core.FolderInspection;
 using FolderGlimpse.Core.Input;
 using FolderGlimpse.Core.Interaction;
@@ -13,6 +14,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings persistence and recovery", TestSettings),
     ("Settings location migration", TestSettingsMigration),
     ("Startup registration migration", TestStartupMigration),
+    ("Launch, onboarding, and activation policy", TestApplicationLifecycle),
     ("Product identity metadata", TestProductIdentity),
     ("Interactive selection model", TestSelection),
     ("Safe item activation", TestActivation),
@@ -279,6 +281,73 @@ static Task TestStartupMigration()
     False(StartupRegistrationMigration.TryMigrate(store, executable), "existing current registration is not overwritten");
     Equal("\"C:\\Newer\\FolderGlimpse.exe\"", store.Values[StartupRegistrationMigration.CurrentValueName], "existing current registration wins");
     False(store.Values.ContainsKey(StartupRegistrationMigration.LegacyValueName), "duplicate legacy registration is removed");
+    return Task.CompletedTask;
+}
+
+static Task TestApplicationLifecycle()
+{
+    Equal(LaunchIntentKind.Normal, LaunchIntent.Parse([]).Kind, "no arguments is a normal launch");
+    Equal(LaunchIntentKind.Startup, LaunchIntent.Parse(["--STARTUP"]).Kind, "startup parsing is case-insensitive");
+    Equal(LaunchIntentKind.Startup, LaunchIntent.Parse(["--settings", "--startup"]).Kind, "startup stays silent even with a deep link");
+    Equal(LaunchIntentKind.Settings, LaunchIntent.Parse(["--settings"]).Kind, "settings argument deep-links");
+    Equal(LaunchIntentKind.About, LaunchIntent.Parse(["--about"]).Kind, "about argument deep-links");
+    Equal(LaunchIntentKind.Capture, LaunchIntent.Parse(["--capture-main=screen.png", "--startup"]).Kind, "capture has isolated precedence");
+    Equal(LaunchIntentKind.Capture, LaunchIntent.Parse(["--capture-welcome=screen.png"]).Kind, "welcome capture is isolated");
+
+    Equal(InitialSurface.Welcome, InitialSurfacePolicy.Decide(new(LaunchIntentKind.Normal), false), "first normal launch welcomes");
+    Equal(InitialSurface.Home, InitialSurfacePolicy.Decide(new(LaunchIntentKind.Normal), true), "returning normal launch opens Home");
+    Equal(InitialSurface.None, InitialSurfacePolicy.Decide(new(LaunchIntentKind.Startup), false), "startup with incomplete onboarding stays silent");
+    Equal(InitialSurface.None, InitialSurfacePolicy.Decide(new(LaunchIntentKind.Startup), true), "startup after onboarding stays silent");
+    Equal(InitialSurface.Settings, InitialSurfacePolicy.Decide(new(LaunchIntentKind.Settings), false), "explicit settings opens settings");
+    Equal(InitialSurface.About, InitialSurfacePolicy.Decide(new(LaunchIntentKind.About), false), "explicit about opens about");
+    Equal(ActivationRequest.OpenDefault, LaunchIntent.Parse([]).ActivationRequest, "normal second launch requests default surface");
+    Equal(null, LaunchIntent.Parse(["--startup"]).ActivationRequest, "startup second launch never activates UI");
+    True(ActivationRequestCodec.TryDecode(ActivationRequestCodec.Encode(ActivationRequest.Settings), out var decoded) && decoded == ActivationRequest.Settings,
+        "activation request round trips");
+    False(ActivationRequestCodec.TryDecode(255, out _), "unknown activation request is rejected");
+    var navigation = new ShellNavigationModel();
+    navigation.Navigate(ShellSection.Settings); navigation.Navigate(ShellSection.HowToUse); navigation.Navigate(ShellSection.About); navigation.Navigate(ShellSection.Home);
+    Equal(ShellSection.Home, navigation.Current, "navigation supports Home -> Settings -> How to Use -> About -> Home");
+
+    var executable = Path.Combine(Path.GetTempPath(), "Folder Glimpse", "FolderGlimpse.exe");
+    var command = StartupCommand.Build(executable);
+    Equal($"\"{Path.GetFullPath(executable)}\" --startup", command, "startup command is quoted and explicit");
+    True(StartupCommand.IsCanonicalFor(command, executable), "canonical startup command matches executable");
+    True(StartupCommand.IsPathOnlyFor($"\"{Path.GetFullPath(executable)}\"", executable), "old path-only command is recognized for upgrade");
+    False(StartupCommand.IsCanonicalFor($"\"{Path.GetFullPath(executable)}\"", executable), "path-only command is not silently treated as canonical");
+    False(StartupCommand.IsCanonicalFor("\"C:\\Other\\FolderGlimpse.exe\" --startup", executable), "another installation is not a match");
+
+    var root = Path.Combine(Path.GetTempPath(), "FolderGlimpse.AppState.Tests", Guid.NewGuid().ToString("N"));
+    var path = Path.Combine(root, "state.json");
+    try
+    {
+        var state = new JsonApplicationStateService(path);
+        state.Load();
+        False(state.Current.HasCompletedOnboarding, "missing state is first run");
+        True(state.TryUpdate(value => value with { HasCompletedOnboarding = true }, out _), "Get Started persists onboarding");
+        var reloaded = new JsonApplicationStateService(path); reloaded.Load();
+        True(reloaded.Current.HasCompletedOnboarding, "subsequent launch retains onboarding completion");
+
+        File.WriteAllText(path, "{ malformed");
+        reloaded.Load();
+        False(reloaded.Current.HasCompletedOnboarding, "malformed state safely returns to Welcome");
+
+        True(reloaded.TryUpdate(value => value with { HasCompletedOnboarding = true }, out _), "state recovers after malformed data");
+        var preferences = new JsonSettingsService(Path.Combine(root, "settings.json"));
+        preferences.Load();
+        preferences.TryResetDefaults(out _);
+        var stillComplete = new JsonApplicationStateService(path); stillComplete.Load();
+        True(stillComplete.Current.HasCompletedOnboarding, "preference reset does not reset onboarding");
+
+        var blocker = Path.Combine(root, "not-a-directory");
+        File.WriteAllText(blocker, "block writes");
+        var failingState = new JsonApplicationStateService(Path.Combine(blocker, "state.json"));
+        failingState.Load();
+        False(failingState.TryUpdate(value => value with { HasCompletedOnboarding = true }, out var saveError), "failed state persistence is reported");
+        False(failingState.Current.HasCompletedOnboarding, "failed Get Started persistence does not claim completion");
+        True(saveError is not null, "failed state persistence explains the error");
+    }
+    finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     return Task.CompletedTask;
 }
 

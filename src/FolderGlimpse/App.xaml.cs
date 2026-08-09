@@ -4,15 +4,17 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using FolderGlimpse.Core;
+using FolderGlimpse.Core.Application;
 using FolderGlimpse.Core.FolderInspection;
 using FolderGlimpse.Core.Input;
 using FolderGlimpse.Core.Interaction;
 using FolderGlimpse.Core.Settings;
-using FolderGlimpse.Branding;
+using FolderGlimpse.Application;
 using FolderGlimpse.ExplorerIntegration;
 using FolderGlimpse.Input;
 using FolderGlimpse.Interaction;
 using FolderGlimpse.Preview;
+using FolderGlimpse.Shell;
 using FolderGlimpse.Startup;
 using FolderGlimpse.Theming;
 using FolderGlimpse.Tray;
@@ -32,8 +34,8 @@ public partial class App : System.Windows.Application
     private KeyboardHook? _hook;
     private PreviewWindow? _preview;
     private ItemActivationService? _activation;
-    private Settings.SettingsWindow? _settingsWindow;
-    private AboutWindow? _aboutWindow;
+    private IApplicationStateService? _appState;
+    private MainWindow? _mainWindow;
     private Forms.NotifyIcon? _tray;
     private System.Drawing.Icon? _trayIcon;
     private Forms.ContextMenuStrip? _trayMenu;
@@ -46,7 +48,8 @@ public partial class App : System.Windows.Application
     private CancellationTokenSource? _previewLoad;
     private ExplorerSnapshot? _gestureSnapshot;
     private FolderGlimpseSettings? _gestureSettings;
-    private Mutex? _singleInstance;
+    private SingleInstanceCoordinator? _singleInstance;
+    private LaunchIntent _launchIntent;
     private volatile bool _enabled = true;
     private int _stickyInputActive;
     private bool _activationInProgress;
@@ -56,25 +59,38 @@ public partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _launchIntent = LaunchIntent.Parse(e.Args);
         var diagnostics = e.Args.Contains("--diagnostics", StringComparer.OrdinalIgnoreCase);
         var allowInjectedInput = e.Args.Contains("--allow-injected-input", StringComparer.OrdinalIgnoreCase);
-        var captureMode = e.Args.Any(argument =>
-            argument.StartsWith("--capture-settings=", StringComparison.OrdinalIgnoreCase) ||
-            argument.StartsWith("--capture-preview=", StringComparison.OrdinalIgnoreCase) ||
-            argument.StartsWith("--capture-tray=", StringComparison.OrdinalIgnoreCase) ||
-            argument.StartsWith("--capture-about=", StringComparison.OrdinalIgnoreCase));
+        var captureMode = _launchIntent.Kind == LaunchIntentKind.Capture;
         if (diagnostics) DiagnosticsLog.Initialize();
-        var mutexName = captureMode ? $"Local\\FolderGlimpse.Capture.{Environment.ProcessId}" : "Local\\FolderGlimpse.SingleInstance";
-        _singleInstance = new Mutex(true, mutexName, out var created);
-        if (!created) { Shutdown(); return; }
+        _singleInstance = SingleInstanceCoordinator.Create(captureMode);
+        if (!_singleInstance.IsPrimary)
+        {
+            var request = _launchIntent.ActivationRequest;
+            if (request is not null && !_singleInstance.TrySignal(request.Value, TimeSpan.FromSeconds(2)))
+                Forms.MessageBox.Show("FolderGlimpse is already running, but its window could not be opened. Try the tray icon.", "FolderGlimpse",
+                    Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+            Shutdown();
+            return;
+        }
+        _singleInstance.ActivationRequested += OnActivationRequested;
+        _singleInstance.StartListening();
 
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        // Visual capture runs use an isolated, disposable profile so QA never mutates or
+        // inherits the installed app's settings while rendering screenshots.
+        var localAppData = captureMode
+            ? Path.Combine(Path.GetTempPath(), "FolderGlimpseCapture", Environment.ProcessId.ToString())
+            : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var settingsPath = Path.Combine(localAppData, "FolderGlimpse", "settings.json");
+        var statePath = Path.Combine(localAppData, "FolderGlimpse", "state.json");
         // Legacy FolderPeek location used only for one-time settings migration.
         var legacySettingsPath = Path.Combine(localAppData, "FolderPeek", "settings.json");
         SettingsPathMigration.TryMigrate(legacySettingsPath, settingsPath);
         _settings = new JsonSettingsService(settingsPath);
         _settings.Load();
+        _appState = new JsonApplicationStateService(statePath);
+        _appState.Load();
         _settings.SettingsChanged += OnSettingsChanged;
         _startup = new RegistryStartupRegistration();
         _startup.Changed += OnStartupRegistrationChanged;
@@ -108,24 +124,23 @@ public partial class App : System.Windows.Application
         CreateTrayIcon();
         var captureThemeText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-theme=", StringComparison.OrdinalIgnoreCase))?["--capture-theme=".Length..];
         if (Enum.TryParse<ThemePreference>(captureThemeText, true, out var captureTheme)) _theme?.SetPreference(captureTheme);
-        if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase)) OpenSettings();
         var settingsCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-settings=", StringComparison.OrdinalIgnoreCase))?["--capture-settings=".Length..];
         if (!string.IsNullOrWhiteSpace(settingsCapture))
         {
             var captureBottom = e.Args.Contains("--capture-bottom", StringComparer.OrdinalIgnoreCase);
             var captureInteraction = e.Args.Contains("--capture-interaction", StringComparer.OrdinalIgnoreCase);
             var exitAfterCapture = e.Args.Contains("--exit-after-capture", StringComparer.OrdinalIgnoreCase);
-            OpenSettings();
+            ShowMain(InitialSurface.Settings, false);
             var captureTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            captureTimer.Tick += (_, _) => { captureTimer.Stop(); _settingsWindow?.CaptureTo(settingsCapture, captureBottom, captureInteraction); if (exitAfterCapture) Shutdown(); };
+            captureTimer.Tick += (_, _) => { captureTimer.Stop(); _mainWindow?.CaptureSettingsTo(settingsCapture, captureBottom, captureInteraction); if (exitAfterCapture) RequestExit(); };
             captureTimer.Start();
         }
         var aboutCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-about=", StringComparison.OrdinalIgnoreCase))?["--capture-about=".Length..];
         if (!string.IsNullOrWhiteSpace(aboutCapture))
         {
-            OpenAbout();
+            ShowMain(InitialSurface.About, false);
             var aboutCaptureTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
-            aboutCaptureTimer.Tick += (_, _) => { aboutCaptureTimer.Stop(); _aboutWindow?.CaptureTo(aboutCapture); Shutdown(); };
+            aboutCaptureTimer.Tick += (_, _) => { aboutCaptureTimer.Stop(); _mainWindow?.CaptureTo(aboutCapture); RequestExit(); };
             aboutCaptureTimer.Start();
         }
         var previewCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-preview=", StringComparison.OrdinalIgnoreCase))?["--capture-preview=".Length..];
@@ -143,6 +158,26 @@ public partial class App : System.Windows.Application
             trayCaptureTimer.Tick += (_, _) => { trayCaptureTimer.Stop(); CaptureTrayMenu(trayCapture); Shutdown(); };
             trayCaptureTimer.Start();
         }
+        var mainCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-main=", StringComparison.OrdinalIgnoreCase))?["--capture-main=".Length..];
+        if (!string.IsNullOrWhiteSpace(mainCapture))
+        {
+            ShowMain(InitialSurface.Home, false);
+            var sectionText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-section=", StringComparison.OrdinalIgnoreCase))?["--capture-section=".Length..];
+            if (Enum.TryParse<ShellSection>(sectionText, true, out var section)) _mainWindow?.Navigate(section);
+            var mainCaptureTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            mainCaptureTimer.Tick += (_, _) => { mainCaptureTimer.Stop(); _mainWindow?.CaptureTo(mainCapture); RequestExit(); };
+            mainCaptureTimer.Start();
+        }
+        var welcomeCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-welcome=", StringComparison.OrdinalIgnoreCase))?["--capture-welcome=".Length..];
+        if (!string.IsNullOrWhiteSpace(welcomeCapture))
+        {
+            ShowMain(InitialSurface.Welcome, false);
+            var welcomeCaptureTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            welcomeCaptureTimer.Tick += (_, _) => { welcomeCaptureTimer.Stop(); _mainWindow?.CaptureTo(welcomeCapture); RequestExit(); };
+            welcomeCaptureTimer.Start();
+        }
+        if (!captureMode)
+            ShowMain(InitialSurfacePolicy.Decide(_launchIntent, _appState.Current.HasCompletedOnboarding));
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"startup diagnostics={diagnostics} allowInjectedInput={allowInjectedInput}");
     }
 
@@ -360,37 +395,52 @@ public partial class App : System.Windows.Application
         _theme?.SetPreference(e.Current.Theme); ApplyTheme();
         if (e.Current.TapBehavior == TapBehavior.MomentaryOnly && _state.State == PeekState.StickyOpen) Apply(_state.Reset());
         if (_preview?.IsVisible == true) _preview.ConfigureInteraction(_state.State == PeekState.StickyOpen, e.Current);
+        _mainWindow?.RefreshState();
     }
 
     private void OnThemeChanged(object? sender, EventArgs e) => ApplyTheme();
-    private void OnStartupRegistrationChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (_startupMenu is not null) _startupMenu.Checked = _startup?.IsEnabled == true; });
+    private void OnStartupRegistrationChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_startupMenu is not null) _startupMenu.Checked = _startup?.IsEnabled == true;
+        _mainWindow?.RefreshState();
+    });
     private void ApplyTheme()
     {
         if (_preview is not null && _theme is not null) _preview.ApplyTheme(_theme);
-        _settingsWindow?.RefreshTheme();
-        _aboutWindow?.RefreshTheme();
+        _mainWindow?.RefreshTheme();
         ApplyTrayTheme();
     }
 
-    private void OpenSettings()
+    private void ShowMain(InitialSurface surface, bool activate = true)
     {
-        if (_settingsWindow is null)
+        if (surface == InitialSurface.None || _settings is null || _startup is null || _appState is null || _theme is null) return;
+        if (_state.State != PeekState.Idle) { _holdTimer?.Stop(); Apply(_state.Reset()); }
+        if (_mainWindow is null)
         {
-            _settingsWindow = new Settings.SettingsWindow(_settings!, _startup!, _theme!);
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _mainWindow = new MainWindow(_settings, _startup, _appState, _theme, () => _enabled, SetEnabled);
         }
-        _settingsWindow.Show(); _settingsWindow.WindowState = WindowState.Normal; _settingsWindow.Activate();
+        _mainWindow.ShowSurface(surface, activate);
     }
 
-    private void OpenAbout()
+    private void OnActivationRequested(ActivationRequest request) => Dispatcher.BeginInvoke(() =>
     {
-        if (_aboutWindow is null)
-        {
-            _aboutWindow = new AboutWindow(_theme!);
-            if (_settingsWindow?.IsVisible == true) _aboutWindow.Owner = _settingsWindow;
-            _aboutWindow.Closed += (_, _) => _aboutWindow = null;
-        }
-        _aboutWindow.Show(); _aboutWindow.WindowState = WindowState.Normal; _aboutWindow.Activate();
+        if (_mainWindow is null)
+            ShowMain(request switch { ActivationRequest.Settings => InitialSurface.Settings, ActivationRequest.About => InitialSurface.About,
+                _ => InitialSurfacePolicy.Decide(new(LaunchIntentKind.Normal), _appState?.Current.HasCompletedOnboarding == true) });
+        else _mainWindow.HandleActivation(request);
+    });
+
+    private void SetEnabled(bool enabled)
+    {
+        _enabled = enabled;
+        if (_enabledMenu is not null) _enabledMenu.Checked = enabled;
+        if (!enabled) { _holdTimer?.Stop(); Apply(_state.ContextInvalidated()); }
+        _mainWindow?.RefreshState();
+    }
+
+    private void RequestExit()
+    {
+        Shutdown();
     }
 
     private void CreateTrayIcon()
@@ -419,18 +469,20 @@ public partial class App : System.Windows.Application
         title.Enabled = false;
         title.Tag = ModernTrayMenuRenderer.TitleItemTag;
         title.Font = _trayTitleFont;
+        var open = TrayItem("Open FolderGlimpse");
+        open.Click += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.Home));
         _enabledMenu = TrayItem("Enabled");
         _enabledMenu.Checked = true;
-        _enabledMenu.Click += (_, _) => { _enabled = !_enabled; _enabledMenu.Checked = _enabled; if (!_enabled) { _holdTimer?.Stop(); Apply(_state.ContextInvalidated()); } };
-        var settings = TrayItem("Settings…"); settings.Click += (_, _) => Dispatcher.BeginInvoke(OpenSettings);
+        _enabledMenu.Click += (_, _) => SetEnabled(!_enabled);
+        var settings = TrayItem("Settings…"); settings.Click += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.Settings));
         _startupMenu = TrayItem("Launch at startup");
         _startupMenu.Checked = _startup!.IsEnabled;
         _startupMenu.Click += (_, _) => { _startup.TrySetEnabled(!_startup.IsEnabled, out var error); _startupMenu.Checked = _startup.IsEnabled; if (error is not null) Forms.MessageBox.Show(error, "FolderGlimpse"); };
-        var about = TrayItem("About FolderGlimpse"); about.Click += (_, _) => Dispatcher.BeginInvoke(OpenAbout);
-        var exit = TrayItem("Exit"); exit.Click += (_, _) => Shutdown();
-        _trayMenu.Items.AddRange([title, TraySeparator(), _enabledMenu, settings, _startupMenu, TraySeparator(), about, exit]);
+        var about = TrayItem("About FolderGlimpse"); about.Click += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.About));
+        var exit = TrayItem("Exit"); exit.Click += (_, _) => RequestExit();
+        _trayMenu.Items.AddRange([title, TraySeparator(), open, _enabledMenu, settings, _startupMenu, TraySeparator(), about, exit]);
         ApplyTrayTheme();
-        _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(OpenSettings);
+        _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.Home));
     }
 
     private static Forms.ToolStripMenuItem TrayItem(string text) => new(text)
@@ -503,7 +555,10 @@ public partial class App : System.Windows.Application
         _trayMenu?.Dispose();
         _trayMenuFont?.Dispose(); _trayTitleFont?.Dispose();
         if (_preview is not null) { _preview.OpenRequested -= OpenSelectedAsync; _preview.CloseRequested -= CloseStickyPreview; }
-        _aboutWindow?.Close(); _settingsWindow?.Close(); _preview?.Close(); _previewLoad?.Dispose(); _singleInstance?.Dispose();
+        if (_singleInstance is not null) _singleInstance.ActivationRequested -= OnActivationRequested;
+        _singleInstance?.Dispose();
+        _mainWindow?.PrepareForExit(); _mainWindow?.Dispose();
+        _preview?.Close(); _previewLoad?.Dispose();
         base.OnExit(e);
     }
 }

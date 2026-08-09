@@ -1,24 +1,23 @@
 using System.Windows;
 using System.IO;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using FolderGlimpse.Core.Settings;
 using FolderGlimpse.Startup;
-using FolderGlimpse.Theming;
 
 namespace FolderGlimpse.Settings;
 
-public partial class SettingsWindow : Window
+public partial class SettingsView : System.Windows.Controls.UserControl, IDisposable
 {
     private readonly ISettingsService _settings;
     private readonly IStartupRegistration _startup;
-    private readonly ThemeManager _theme;
     private bool _loading;
+    private bool _disposed;
+    internal event Action? HomeRequested;
 
-    internal SettingsWindow(ISettingsService settings, IStartupRegistration startup, ThemeManager theme)
+    internal SettingsView(ISettingsService settings, IStartupRegistration startup)
     {
-        _settings = settings; _startup = startup; _theme = theme;
+        _settings = settings; _startup = startup;
         InitializeComponent();
         ThemeBox.ItemsSource = new[] { new Choice<ThemePreference>("Use Windows setting", ThemePreference.System), new("Light", ThemePreference.Light), new("Dark", ThemePreference.Dark) };
         DensityBox.ItemsSource = new[] { new Choice<DisplayDensity>("Comfortable", DisplayDensity.Comfortable), new("Compact", DisplayDensity.Compact) };
@@ -29,12 +28,7 @@ public partial class SettingsWindow : Window
         Loaded += (_, _) => LoadValues();
         _settings.SettingsChanged += SettingsChanged;
         _startup.Changed += StartupStateChanged;
-        Closed += (_, _) => { _settings.SettingsChanged -= SettingsChanged; _startup.Changed -= StartupStateChanged; };
-        SourceInitialized += (_, _) => _theme.ApplyWindowChrome(this);
-        _theme.Apply(this);
     }
-
-    internal void RefreshTheme() { _theme.Apply(this); if (IsLoaded) _theme.ApplyWindowChrome(this); }
 
     internal void CaptureTo(string path, bool scrollToEnd = false, bool showInteraction = false)
     {
@@ -85,7 +79,7 @@ public partial class SettingsWindow : Window
         if (_loading || !IsLoaded) return;
         UpdateLabels();
         var limit = (LimitBox.SelectedItem as Choice<int>)?.Value ?? 50;
-        _settings.TryUpdate(s => s with
+        var saved = _settings.TryUpdate(s => s with
         {
             Theme = (ThemeBox.SelectedItem as Choice<ThemePreference>)?.Value ?? s.Theme,
             PopupWidth = WidthSlider.Value, MaxPopupHeight = HeightSlider.Value,
@@ -107,6 +101,7 @@ public partial class SettingsWindow : Window
             ConfirmBeforeOpeningMoreThan = (int)ConfirmSlider.Value,
             ClosePreviewAfterOpening = CloseAfterOpenCheck.IsChecked == true
         }, out var error);
+        if (!saved) LoadValues();
         ErrorText.Text = error ?? string.Empty;
         UpdateDependencies();
     }
@@ -140,7 +135,15 @@ public partial class SettingsWindow : Window
     }
 
     private void ResetClicked(object sender, RoutedEventArgs e) { _settings.TryResetDefaults(out var error); ErrorText.Text = error ?? string.Empty; LoadValues(); }
-    private void DoneClicked(object sender, RoutedEventArgs e) => Close();
+    private void DoneClicked(object sender, RoutedEventArgs e) => HomeRequested?.Invoke();
     private static object? FindChoice<T>(System.Windows.Controls.ComboBox box, T value) => box.Items.Cast<Choice<T>>().FirstOrDefault(choice => EqualityComparer<T>.Default.Equals(choice.Value, value));
     private sealed record Choice<T>(string Label, T Value) { public override string ToString() => Label; }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _settings.SettingsChanged -= SettingsChanged;
+        _startup.Changed -= StartupStateChanged;
+    }
 }

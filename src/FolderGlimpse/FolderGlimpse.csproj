@@ -20,6 +20,7 @@
     <ProjectReference Include="..\FolderGlimpse.Core\FolderGlimpse.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="Assets\Branding\FolderGlimpse-App.ico" />
     <Resource Include="Assets\Branding\FolderGlimpse-Tray.ico" />
   </ItemGroup>
 </Project>
