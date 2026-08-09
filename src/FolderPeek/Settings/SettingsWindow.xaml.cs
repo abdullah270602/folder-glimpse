@@ -1,4 +1,8 @@
 using System.Windows;
+using System.IO;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using FolderPeek.Core.Settings;
 using FolderPeek.Startup;
 using FolderPeek.Theming;
@@ -16,20 +20,36 @@ public partial class SettingsWindow : Window
     {
         _settings = settings; _startup = startup; _theme = theme;
         InitializeComponent();
-        ThemeBox.ItemsSource = Enum.GetValues<ThemePreference>();
-        DensityBox.ItemsSource = Enum.GetValues<DisplayDensity>();
-        SortBox.ItemsSource = Enum.GetValues<SortMode>();
-        HotkeyBox.ItemsSource = Enum.GetValues<TriggerHotkey>();
-        TapBox.ItemsSource = Enum.GetValues<TapBehavior>();
-        LimitBox.ItemsSource = new[] { new Choice("20", 20), new("50", 50), new("100", 100), new("200", 200), new("All", 0) };
+        ThemeBox.ItemsSource = new[] { new Choice<ThemePreference>("Use Windows setting", ThemePreference.System), new("Light", ThemePreference.Light), new("Dark", ThemePreference.Dark) };
+        DensityBox.ItemsSource = new[] { new Choice<DisplayDensity>("Comfortable", DisplayDensity.Comfortable), new("Compact", DisplayDensity.Compact) };
+        SortBox.ItemsSource = new[] { new Choice<SortMode>("Name", SortMode.Name), new("Modified date", SortMode.ModifiedDate), new("File type", SortMode.Type) };
+        HotkeyBox.ItemsSource = new[] { new Choice<TriggerHotkey>("Space", TriggerHotkey.Space), new("Ctrl + Space", TriggerHotkey.ControlSpace) };
+        TapBox.ItemsSource = new[] { new Choice<TapBehavior>("Toggle preview", TapBehavior.TogglePreview), new("Momentary only", TapBehavior.MomentaryOnly) };
+        LimitBox.ItemsSource = new[] { new Choice<int>("20 items", 20), new("50 items", 50), new("100 items", 100), new("200 items", 200), new("All items", 0) };
         Loaded += (_, _) => LoadValues();
         _settings.SettingsChanged += SettingsChanged;
         _startup.Changed += StartupStateChanged;
         Closed += (_, _) => { _settings.SettingsChanged -= SettingsChanged; _startup.Changed -= StartupStateChanged; };
+        SourceInitialized += (_, _) => _theme.ApplyWindowChrome(this);
         _theme.Apply(this);
     }
 
-    internal void RefreshTheme() => _theme.Apply(this);
+    internal void RefreshTheme() { _theme.Apply(this); if (IsLoaded) _theme.ApplyWindowChrome(this); }
+
+    internal void CaptureTo(string path, bool scrollToEnd = false)
+    {
+        if (scrollToEnd) MainScrollViewer.ScrollToEnd(); else MainScrollViewer.ScrollToTop();
+        UpdateLayout();
+        var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+        var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(this);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        encoder.Save(stream);
+    }
     private void SettingsChanged(object? sender, SettingsChangedEventArgs e) => Dispatcher.BeginInvoke(LoadValues);
     private void StartupStateChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(LoadValues);
 
@@ -37,12 +57,12 @@ public partial class SettingsWindow : Window
     {
         _loading = true;
         var s = _settings.Current;
-        ThemeBox.SelectedItem = s.Theme; WidthSlider.Value = s.PopupWidth; HeightSlider.Value = s.MaxPopupHeight;
+        ThemeBox.SelectedItem = FindChoice(ThemeBox, s.Theme); WidthSlider.Value = s.PopupWidth; HeightSlider.Value = s.MaxPopupHeight;
         PathCheck.IsChecked = s.ShowFullPath; SizeCheck.IsChecked = s.ShowFileSize; DateCheck.IsChecked = s.ShowModifiedDate;
-        HiddenCheck.IsChecked = s.ShowHiddenFiles; SortBox.SelectedItem = s.SortMode; FoldersCheck.IsChecked = s.FoldersFirst;
-        LimitBox.SelectedItem = LimitBox.Items.Cast<Choice>().First(x => x.Value == s.InitialItemLimit);
-        DensityBox.SelectedItem = s.Density; HotkeyBox.SelectedItem = s.Hotkey; HoldSlider.Value = s.HoldThresholdMs;
-        TapBox.SelectedItem = s.TapBehavior; StartupCheck.IsChecked = _startup.IsEnabled;
+        HiddenCheck.IsChecked = s.ShowHiddenFiles; SortBox.SelectedItem = FindChoice(SortBox, s.SortMode); FoldersCheck.IsChecked = s.FoldersFirst;
+        LimitBox.SelectedItem = FindChoice(LimitBox, s.InitialItemLimit);
+        DensityBox.SelectedItem = FindChoice(DensityBox, s.Density); HotkeyBox.SelectedItem = FindChoice(HotkeyBox, s.Hotkey); HoldSlider.Value = s.HoldThresholdMs;
+        TapBox.SelectedItem = FindChoice(TapBox, s.TapBehavior); StartupCheck.IsChecked = _startup.IsEnabled;
         UpdateLabels(); ErrorText.Text = _settings.LastError ?? string.Empty;
         _loading = false;
     }
@@ -51,19 +71,19 @@ public partial class SettingsWindow : Window
     {
         if (_loading || !IsLoaded) return;
         UpdateLabels();
-        var limit = (LimitBox.SelectedItem as Choice)?.Value ?? 50;
+        var limit = (LimitBox.SelectedItem as Choice<int>)?.Value ?? 50;
         _settings.TryUpdate(s => s with
         {
-            Theme = ThemeBox.SelectedItem is ThemePreference theme ? theme : s.Theme,
+            Theme = (ThemeBox.SelectedItem as Choice<ThemePreference>)?.Value ?? s.Theme,
             PopupWidth = WidthSlider.Value, MaxPopupHeight = HeightSlider.Value,
             ShowFullPath = PathCheck.IsChecked == true, ShowFileSize = SizeCheck.IsChecked == true,
             ShowModifiedDate = DateCheck.IsChecked == true, ShowHiddenFiles = HiddenCheck.IsChecked == true,
-            SortMode = SortBox.SelectedItem is SortMode sort ? sort : s.SortMode,
+            SortMode = (SortBox.SelectedItem as Choice<SortMode>)?.Value ?? s.SortMode,
             FoldersFirst = FoldersCheck.IsChecked == true, InitialItemLimit = limit,
-            Density = DensityBox.SelectedItem is DisplayDensity density ? density : s.Density,
-            Hotkey = HotkeyBox.SelectedItem is TriggerHotkey hotkey ? hotkey : s.Hotkey,
+            Density = (DensityBox.SelectedItem as Choice<DisplayDensity>)?.Value ?? s.Density,
+            Hotkey = (HotkeyBox.SelectedItem as Choice<TriggerHotkey>)?.Value ?? s.Hotkey,
             HoldThresholdMs = (int)HoldSlider.Value,
-            TapBehavior = TapBox.SelectedItem is TapBehavior tap ? tap : s.TapBehavior
+            TapBehavior = (TapBox.SelectedItem as Choice<TapBehavior>)?.Value ?? s.TapBehavior
         }, out var error);
         ErrorText.Text = error ?? string.Empty;
     }
@@ -80,12 +100,13 @@ public partial class SettingsWindow : Window
 
     private void UpdateLabels()
     {
-        WidthLabel.Text = $"Popup width  ·  {(int)WidthSlider.Value} px";
-        HeightLabel.Text = $"Maximum height  ·  {(int)HeightSlider.Value} px";
-        HoldLabel.Text = $"Hold delay  ·  {(int)HoldSlider.Value} ms";
+        WidthLabel.Text = $"{(int)WidthSlider.Value} px";
+        HeightLabel.Text = $"{(int)HeightSlider.Value} px";
+        HoldLabel.Text = $"{(int)HoldSlider.Value} ms";
     }
 
     private void ResetClicked(object sender, RoutedEventArgs e) { _settings.TryResetDefaults(out var error); ErrorText.Text = error ?? string.Empty; LoadValues(); }
     private void DoneClicked(object sender, RoutedEventArgs e) => Close();
-    private sealed record Choice(string Label, int Value) { public override string ToString() => Label; }
+    private static object? FindChoice<T>(System.Windows.Controls.ComboBox box, T value) => box.Items.Cast<Choice<T>>().FirstOrDefault(choice => EqualityComparer<T>.Default.Equals(choice.Value, value));
+    private sealed record Choice<T>(string Label, T Value) { public override string ToString() => Label; }
 }

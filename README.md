@@ -58,6 +58,8 @@ dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-con
 - native shell icons loaded after names appear, so icon extraction does not delay content
 - per-monitor-V2 physical-pixel positioning and work-area clamping
 - live system/light/dark theming, atomic JSON settings, and HKCU launch-at-sign-in control
+- shared Fluent-inspired WPF templates for cards, buttons, toggles, dropdowns, sliders,
+  and the same compact scrollbar in Settings and the preview
 
 See [the architecture decision](docs/architecture.md) and
 [manual integration checklist/results](docs/manual-testing.md).
@@ -86,3 +88,7 @@ If Explorer integration needs troubleshooting, start FolderPeek from PowerShell 
 `--diagnostics`. It writes `%LOCALAPPDATA%\FolderPeek\diagnostics.log`. The additional
 `--allow-injected-input` switch exists only for automated integration testing; normal
 launches continue rejecting injected keyboard events.
+
+Visual QA can render deterministic Settings and preview snapshots with
+`--capture-settings=<png>`, `--capture-preview=<png> --preview-folder=<path>`, optional
+`--capture-theme=Light|Dark`, and `--capture-bottom`.

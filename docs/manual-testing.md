@@ -19,6 +19,9 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Mixed-DPI/light-dark visual inspection | Not run |
 | Settings missing/partial/malformed recovery | Pass (automated) |
 | Hidden, modified-date, global-limit sorting | Pass (automated) |
+| Modern Settings render in explicit Light and Dark | Pass (deterministic render inspection) |
+| Shared Settings/Preview scrollbar render | Pass (deterministic render inspection) |
+| Combo/toggle/slider/button accessibility patterns | Pass (6/6 combos, 6/6 toggles, 3/3 sliders, both actions) |
 
 The desktop-control service could not enumerate Windows (`EnumWindows` returned
 `0x80070003`), so validation used direct Windows UI Automation, Shell automation, and an

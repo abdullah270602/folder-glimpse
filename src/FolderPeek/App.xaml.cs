@@ -77,7 +77,23 @@ public partial class App : System.Windows.Application
         _contextTimer.Tick += (_, _) => ValidateOpenContext();
         _contextTimer.Start();
         CreateTrayIcon();
+        var captureThemeText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-theme=", StringComparison.OrdinalIgnoreCase))?["--capture-theme=".Length..];
+        if (Enum.TryParse<ThemePreference>(captureThemeText, true, out var captureTheme)) _theme?.SetPreference(captureTheme);
         if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase)) OpenSettings();
+        var settingsCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-settings=", StringComparison.OrdinalIgnoreCase))?["--capture-settings=".Length..];
+        if (!string.IsNullOrWhiteSpace(settingsCapture))
+        {
+            var captureBottom = e.Args.Contains("--capture-bottom", StringComparer.OrdinalIgnoreCase);
+            var exitAfterCapture = e.Args.Contains("--exit-after-capture", StringComparer.OrdinalIgnoreCase);
+            OpenSettings();
+            var captureTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            captureTimer.Tick += (_, _) => { captureTimer.Stop(); _settingsWindow?.CaptureTo(settingsCapture, captureBottom); if (exitAfterCapture) Shutdown(); };
+            captureTimer.Start();
+        }
+        var previewCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-preview=", StringComparison.OrdinalIgnoreCase))?["--capture-preview=".Length..];
+        var previewFolder = e.Args.FirstOrDefault(argument => argument.StartsWith("--preview-folder=", StringComparison.OrdinalIgnoreCase))?["--preview-folder=".Length..];
+        if (!string.IsNullOrWhiteSpace(previewCapture) && !string.IsNullOrWhiteSpace(previewFolder) && Directory.Exists(previewFolder))
+            _ = CapturePreviewAsync(previewFolder, previewCapture);
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"startup diagnostics={diagnostics} allowInjectedInput={allowInjectedInput}");
     }
 
@@ -171,6 +187,16 @@ public partial class App : System.Windows.Application
             : $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}");
         _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings);
         _ = LoadIconsAsync(contents, settings, generation, token);
+    }
+
+    private async Task CapturePreviewAsync(string folder, string output)
+    {
+        var snapshot = new ExplorerSnapshot(true, "Capture", NativeMethods.GetForegroundWindow(), 0, 0, folder,
+            Path.GetFileName(folder), CursorAnchor(), DateTimeOffset.UtcNow, 1);
+        await OpenPreviewAsync(snapshot, _settings!.Current);
+        await Task.Delay(900);
+        _preview?.CaptureTo(output);
+        Shutdown();
     }
 
     private async Task LoadIconsAsync(FolderContents contents, FolderPeekSettings settings, long generation, CancellationToken token)

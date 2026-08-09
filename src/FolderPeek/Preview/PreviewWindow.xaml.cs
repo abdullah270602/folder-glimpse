@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.IO;
 using FolderPeek.Core;
 using FolderPeek.Core.Settings;
 using FolderPeek.Theming;
@@ -37,6 +39,20 @@ public partial class PreviewWindow : Window
     }
 
     internal void ApplyTheme(ThemeManager theme) { theme.Apply(this); Background = (System.Windows.Media.Brush)Resources["PanelBrush"]; }
+
+    internal void CaptureTo(string path)
+    {
+        UpdateLayout();
+        var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+        var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(this);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+        encoder.Save(stream);
+    }
 
     internal void ShowBeside(PixelRect anchor, FolderPeekSettings settings)
     {

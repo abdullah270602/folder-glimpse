@@ -24,6 +24,7 @@ internal static class NativeMethods
     internal const uint SwpShowWindow = 0x0040;
     internal const uint MonitorDefaultToNearest = 2;
     internal const int DwmwaWindowCornerPreference = 33;
+    internal const int DwmwaUseImmersiveDarkMode = 20;
     internal const int DwmwcpRoundSmall = 3;
 
     internal static readonly nint HwndTopmost = new(-1);

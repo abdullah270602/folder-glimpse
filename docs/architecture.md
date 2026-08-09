@@ -89,6 +89,14 @@ corners. Placement converts the WPF desired DIP size once using the target DPI, 
 does side selection and clamping entirely in physical pixels. Negative monitor origins
 and taskbars on any edge are supported through `MonitorFromRect` and `GetMonitorInfo`.
 
+Settings and Preview consume one application-level WPF resource dictionary. It defines
+the typography, cards, buttons, toggle switches, combo boxes, sliders, focus states, and
+one vertical scrollbar template, while `ThemeManager` supplies light/dark palette brushes
+at runtime. Settings follows the Windows single-column settings-card pattern: every change
+applies immediately, descriptions clarify consequences, controls align consistently, and
+the action footer stays visible while content scrolls. The native title bar follows dark
+mode through DWM so it does not clash with the content surface.
+
 ## Alternatives considered
 
 - **WinUI 3:** better built-in Fluent styling, but materially more packaging/interoperability
@@ -128,3 +136,6 @@ and taskbars on any edge are supported through `MonitorFromRect` and `GetMonitor
 - [Per-monitor-V2 manifests](https://learn.microsoft.com/windows/win32/sbscs/application-manifests)
 - [SetWindowPos](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowpos)
 - [WPF control virtualization](https://learn.microsoft.com/dotnet/desktop/wpf/advanced/optimizing-performance-controls)
+- [Windows settings design guidance](https://learn.microsoft.com/windows/apps/design/app-settings/guidelines-for-app-settings)
+- [Windows content layout and spacing](https://learn.microsoft.com/windows/apps/design/basics/content-basics)
+- [WPF styles and templates](https://learn.microsoft.com/dotnet/desktop/wpf/controls/styles-templates-overview)
