@@ -289,7 +289,7 @@ public partial class App : System.Windows.Application
             ShowCheckMargin = true,
             ShowImageMargin = false,
             DropShadowEnabled = true,
-            Padding = new Forms.Padding(6),
+            Padding = new Forms.Padding(6, 12, 6, 6),
             Font = _trayMenuFont
         };
         _tray = new Forms.NotifyIcon { Text = "FolderPeek", Icon = System.Drawing.SystemIcons.Application, Visible = true, ContextMenuStrip = _trayMenu };
