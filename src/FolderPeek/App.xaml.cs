@@ -13,6 +13,7 @@ using FolderPeek.Input;
 using FolderPeek.Preview;
 using FolderPeek.Startup;
 using FolderPeek.Theming;
+using FolderPeek.Tray;
 using Forms = System.Windows.Forms;
 
 namespace FolderPeek;
@@ -29,8 +30,11 @@ public partial class App : System.Windows.Application
     private PreviewWindow? _preview;
     private Settings.SettingsWindow? _settingsWindow;
     private Forms.NotifyIcon? _tray;
+    private Forms.ContextMenuStrip? _trayMenu;
     private Forms.ToolStripMenuItem? _enabledMenu;
     private Forms.ToolStripMenuItem? _startupMenu;
+    private System.Drawing.Font? _trayMenuFont;
+    private System.Drawing.Font? _trayTitleFont;
     private DispatcherTimer? _holdTimer;
     private DispatcherTimer? _contextTimer;
     private CancellationTokenSource? _previewLoad;
@@ -94,6 +98,13 @@ public partial class App : System.Windows.Application
         var previewFolder = e.Args.FirstOrDefault(argument => argument.StartsWith("--preview-folder=", StringComparison.OrdinalIgnoreCase))?["--preview-folder=".Length..];
         if (!string.IsNullOrWhiteSpace(previewCapture) && !string.IsNullOrWhiteSpace(previewFolder) && Directory.Exists(previewFolder))
             _ = CapturePreviewAsync(previewFolder, previewCapture);
+        var trayCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-tray=", StringComparison.OrdinalIgnoreCase))?["--capture-tray=".Length..];
+        if (!string.IsNullOrWhiteSpace(trayCapture))
+        {
+            var trayCaptureTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+            trayCaptureTimer.Tick += (_, _) => { trayCaptureTimer.Stop(); CaptureTrayMenu(trayCapture); Shutdown(); };
+            trayCaptureTimer.Start();
+        }
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"startup diagnostics={diagnostics} allowInjectedInput={allowInjectedInput}");
     }
 
@@ -251,7 +262,12 @@ public partial class App : System.Windows.Application
 
     private void OnThemeChanged(object? sender, EventArgs e) => ApplyTheme();
     private void OnStartupRegistrationChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { if (_startupMenu is not null) _startupMenu.Checked = _startup?.IsEnabled == true; });
-    private void ApplyTheme() { if (_preview is not null && _theme is not null) _preview.ApplyTheme(_theme); _settingsWindow?.RefreshTheme(); }
+    private void ApplyTheme()
+    {
+        if (_preview is not null && _theme is not null) _preview.ApplyTheme(_theme);
+        _settingsWindow?.RefreshTheme();
+        ApplyTrayTheme();
+    }
 
     private void OpenSettings()
     {
@@ -265,18 +281,88 @@ public partial class App : System.Windows.Application
 
     private void CreateTrayIcon()
     {
-        _tray = new Forms.NotifyIcon { Text = "FolderPeek", Icon = System.Drawing.SystemIcons.Application, Visible = true, ContextMenuStrip = new Forms.ContextMenuStrip() };
-        _tray.ContextMenuStrip.Opening += (_, _) => { if (_startupMenu is not null) _startupMenu.Checked = _startup?.IsEnabled == true; };
-        var title = new Forms.ToolStripMenuItem("FolderPeek") { Enabled = false, Font = new System.Drawing.Font(Forms.Control.DefaultFont, System.Drawing.FontStyle.Bold) };
-        _enabledMenu = new Forms.ToolStripMenuItem("Enabled") { Checked = true };
+        _trayMenuFont = new System.Drawing.Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+        _trayTitleFont = new System.Drawing.Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
+        _trayMenu = new Forms.ContextMenuStrip
+        {
+            AutoSize = true,
+            ShowCheckMargin = true,
+            ShowImageMargin = false,
+            DropShadowEnabled = true,
+            Padding = new Forms.Padding(6),
+            Font = _trayMenuFont
+        };
+        _tray = new Forms.NotifyIcon { Text = "FolderPeek", Icon = System.Drawing.SystemIcons.Application, Visible = true, ContextMenuStrip = _trayMenu };
+        _trayMenu.Opening += (_, _) =>
+        {
+            if (_startupMenu is not null) _startupMenu.Checked = _startup?.IsEnabled == true;
+            ApplyTrayTheme();
+        };
+        _trayMenu.Opened += (_, _) => ApplyNativeTrayTheme();
+
+        var title = TrayItem("FolderPeek");
+        title.Enabled = false;
+        title.Tag = ModernTrayMenuRenderer.TitleItemTag;
+        title.Font = _trayTitleFont;
+        _enabledMenu = TrayItem("Enabled");
+        _enabledMenu.Checked = true;
         _enabledMenu.Click += (_, _) => { _enabled = !_enabled; _enabledMenu.Checked = _enabled; if (!_enabled) { _holdTimer?.Stop(); Apply(_state.ContextInvalidated()); } };
-        var settings = new Forms.ToolStripMenuItem("Settings…"); settings.Click += (_, _) => Dispatcher.BeginInvoke(OpenSettings);
-        _startupMenu = new Forms.ToolStripMenuItem("Launch at startup") { Checked = _startup!.IsEnabled };
+        var settings = TrayItem("Settings…"); settings.Click += (_, _) => Dispatcher.BeginInvoke(OpenSettings);
+        _startupMenu = TrayItem("Launch at startup");
+        _startupMenu.Checked = _startup!.IsEnabled;
         _startupMenu.Click += (_, _) => { _startup.TrySetEnabled(!_startup.IsEnabled, out var error); _startupMenu.Checked = _startup.IsEnabled; if (error is not null) Forms.MessageBox.Show(error, "FolderPeek"); };
-        var about = new Forms.ToolStripMenuItem("About"); about.Click += (_, _) => Forms.MessageBox.Show($"FolderPeek {Assembly.GetExecutingAssembly().GetName().Version}\n\nPress Space on a selected folder to peek inside.", "About FolderPeek");
-        var exit = new Forms.ToolStripMenuItem("Exit"); exit.Click += (_, _) => Shutdown();
-        _tray.ContextMenuStrip.Items.AddRange([title, new Forms.ToolStripSeparator(), _enabledMenu, settings, _startupMenu, new Forms.ToolStripSeparator(), about, exit]);
+        var about = TrayItem("About"); about.Click += (_, _) => Forms.MessageBox.Show($"FolderPeek {Assembly.GetExecutingAssembly().GetName().Version}\n\nPress Space on a selected folder to peek inside.", "About FolderPeek");
+        var exit = TrayItem("Exit"); exit.Click += (_, _) => Shutdown();
+        _trayMenu.Items.AddRange([title, TraySeparator(), _enabledMenu, settings, _startupMenu, TraySeparator(), about, exit]);
+        ApplyTrayTheme();
         _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(OpenSettings);
+    }
+
+    private static Forms.ToolStripMenuItem TrayItem(string text) => new(text)
+    {
+        AutoSize = false,
+        Size = new System.Drawing.Size(224, 36),
+        Padding = new Forms.Padding(0, 0, 12, 0),
+        Margin = Forms.Padding.Empty
+    };
+
+    private static Forms.ToolStripSeparator TraySeparator() => new()
+    {
+        AutoSize = false,
+        Size = new System.Drawing.Size(224, 9),
+        Margin = Forms.Padding.Empty
+    };
+
+    private void ApplyTrayTheme()
+    {
+        if (_trayMenu is null || _theme is null) return;
+        var renderer = new ModernTrayMenuRenderer(_theme.IsDark);
+        _trayMenu.Renderer = renderer;
+        _trayMenu.BackColor = renderer.BackgroundColor;
+        _trayMenu.ForeColor = renderer.ForegroundColor;
+        _trayMenu.Invalidate(true);
+    }
+
+    private void ApplyNativeTrayTheme()
+    {
+        if (_trayMenu is null || _theme is null || !_trayMenu.IsHandleCreated) return;
+        var dark = _theme.IsDark ? 1 : 0;
+        NativeMethods.DwmSetWindowAttribute(_trayMenu.Handle, NativeMethods.DwmwaUseImmersiveDarkMode, ref dark, sizeof(int));
+        var corner = NativeMethods.DwmwcpRoundSmall;
+        NativeMethods.DwmSetWindowAttribute(_trayMenu.Handle, NativeMethods.DwmwaWindowCornerPreference, ref corner, sizeof(int));
+    }
+
+    private void CaptureTrayMenu(string path)
+    {
+        if (_trayMenu is null) return;
+        _trayMenu.Show(new System.Drawing.Point(32, 32));
+        _trayMenu.PerformLayout();
+        _trayMenu.Items.OfType<Forms.ToolStripMenuItem>().FirstOrDefault(item => item.Text == "Settings…")?.Select();
+        using var bitmap = new System.Drawing.Bitmap(_trayMenu.Width, _trayMenu.Height);
+        _trayMenu.DrawToBitmap(bitmap, _trayMenu.ClientRectangle);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        _trayMenu.Close();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -288,6 +374,8 @@ public partial class App : System.Windows.Application
         if (_hook is not null) { _hook.Gesture -= OnHookGesture; _hook.Dispose(); }
         _monitor?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
+        _trayMenu?.Dispose();
+        _trayMenuFont?.Dispose(); _trayTitleFont?.Dispose();
         _settingsWindow?.Close(); _preview?.Close(); _previewLoad?.Dispose(); _singleInstance?.Dispose();
         base.OnExit(e);
     }

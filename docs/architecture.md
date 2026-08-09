@@ -97,6 +97,12 @@ applies immediately, descriptions clarify consequences, controls align consisten
 the action footer stays visible while content scrolls. The native title bar follows dark
 mode through DWM so it does not clash with the content surface.
 
+The notification-area menu is a WinForms `ContextMenuStrip`, so it cannot consume WPF
+templates. A dedicated `ToolStripProfessionalRenderer` maps the same resolved palette to
+its background, text, separators, rounded selection state, and accent checkmarks. The
+renderer is swapped whenever `ThemeManager` changes, and DWM receives matching dark-mode
+and rounded-corner attributes when the menu opens. High-contrast mode maps to system colors.
+
 ## Alternatives considered
 
 - **WinUI 3:** better built-in Fluent styling, but materially more packaging/interoperability
@@ -139,3 +145,4 @@ mode through DWM so it does not clash with the content surface.
 - [Windows settings design guidance](https://learn.microsoft.com/windows/apps/design/app-settings/guidelines-for-app-settings)
 - [Windows content layout and spacing](https://learn.microsoft.com/windows/apps/design/basics/content-basics)
 - [WPF styles and templates](https://learn.microsoft.com/dotnet/desktop/wpf/controls/styles-templates-overview)
+- [ToolStrip custom renderers](https://learn.microsoft.com/dotnet/api/system.windows.forms.toolstripprofessionalrenderer)

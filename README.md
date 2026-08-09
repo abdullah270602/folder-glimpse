@@ -60,6 +60,8 @@ dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-con
 - live system/light/dark theming, atomic JSON settings, and HKCU launch-at-sign-in control
 - shared Fluent-inspired WPF templates for cards, buttons, toggles, dropdowns, sliders,
   and the same compact scrollbar in Settings and the preview
+- a custom light/dark tray renderer with modern spacing, rounded hover states, accent
+  checkmarks, and live synchronization with the selected app theme
 
 See [the architecture decision](docs/architecture.md) and
 [manual integration checklist/results](docs/manual-testing.md).
@@ -91,4 +93,4 @@ launches continue rejecting injected keyboard events.
 
 Visual QA can render deterministic Settings and preview snapshots with
 `--capture-settings=<png>`, `--capture-preview=<png> --preview-folder=<path>`, optional
-`--capture-theme=Light|Dark`, and `--capture-bottom`.
+`--capture-tray=<png>`, `--capture-theme=Light|Dark`, and `--capture-bottom`.
