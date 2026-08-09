@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460">
+  <rect width="900" height="460" rx="24" fill="#eef1f6"/>
+  <rect x="235" y="55" width="430" height="350" rx="12" fill="#fafafa" stroke="#d7d7d7"/>
+  <text x="270" y="105" font-family="Segoe UI Emoji, Segoe UI" font-size="25">📁</text>
+  <text x="310" y="101" font-family="Segoe UI" font-size="19" font-weight="600" fill="#202020">Projects</text>
+  <text x="310" y="121" font-family="Segoe UI" font-size="12" fill="#737373">C:\Work\Projects</text>
+  <line x1="236" y1="140" x2="664" y2="140" stroke="#dedede"/>
+  <g font-family="Segoe UI Emoji, Segoe UI" font-size="16" fill="#242424">
+    <text x="270" y="181">📁   echolet</text><text x="270" y="222">📁   portfolio</text>
+    <text x="270" y="263">📁   experiments</text><text x="270" y="304">📄   README.md</text>
+    <text x="270" y="345">🐍   app.py</text>
+  </g>
+  <g font-family="Segoe UI" font-size="12" fill="#747474" text-anchor="end">
+    <text x="630" y="304">8 KB</text><text x="630" y="345">14 KB</text>
+  </g>
+  <line x1="236" y1="368" x2="664" y2="368" stroke="#dedede"/>
+  <text x="270" y="392" font-family="Segoe UI" font-size="12" fill="#747474">5 items</text>
+</svg>
