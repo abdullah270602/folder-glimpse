@@ -30,15 +30,15 @@
         <TextBlock Text="📁" FontSize="22" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1">
           <TextBlock Text="{Binding FolderName}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-          <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="{DynamicResource SubtleTextBrush}"
-                     Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding FolderPath}" ToolTip="{Binding FolderPath}" Visibility="{Binding PathVisibility}"
+                     FontSize="11" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </Grid>
       <Border Grid.Row="1" Background="{DynamicResource LineBrush}" />
       <Grid Grid.Row="2">
         <ListBox x:Name="EntryList" ItemsSource="{Binding Entries}" Background="Transparent" BorderThickness="0" Padding="8,7"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                 ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
           <ListBox.Resources>
             <Style TargetType="ScrollBar">
               <Setter Property="Width" Value="12" />
@@ -96,11 +96,13 @@
           <ListBox.ItemTemplate>
             <DataTemplate>
               <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <Image Source="{Binding Icon}" Width="18" Height="18" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                <TextBlock Grid.Column="1" Text="{Binding Name}" ToolTip="{Binding Name}" FontSize="13" VerticalAlignment="Center"
                            Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="11" Margin="12,0,3,0" VerticalAlignment="Center"
+                <TextBlock Grid.Column="2" Text="{Binding SizeText}" Visibility="{Binding SizeVisibility}" FontSize="11" Margin="12,0,3,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource SubtleTextBrush}" />
+                <TextBlock Grid.Column="3" Text="{Binding ModifiedText}" Visibility="{Binding ModifiedVisibility}" FontSize="11" Margin="12,0,3,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource SubtleTextBrush}" />
               </Grid>
             </DataTemplate>

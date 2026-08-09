@@ -18,9 +18,14 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
   cancellation and a bounded initial result set. Directories sort before files.
 - `Preview` is one reusable, non-activating WPF window. Placement is computed in physical
   pixels against the selected monitor work area and applied with `SetWindowPos`.
+- `Settings` is an immutable snapshot published by a central JSON service. Writes use a
+  same-directory temporary file and atomic replacement; invalid, missing, or partial files
+  recover to normalized defaults. Startup registration remains a separate Windows source
+  of truth under the current user's Run key.
 
-The application is per-monitor-V2 DPI aware and x64. A tray icon controls enable/disable
-and exit. Release logging is off; debug logging records integration and state decisions.
+The application is per-monitor-V2 DPI aware and x64. A tray icon controls enable/disable,
+settings, launch-at-sign-in, About, and exit. Release logging is off; debug logging records
+integration and state decisions.
 
 ## Input ownership and safety
 
@@ -33,7 +38,7 @@ and up are passed.
 Eligibility requires all of the following:
 
 1. FolderPeek is enabled.
-2. The event is physical, plain Space (no Ctrl, Alt, Shift, or Windows key).
+2. The event is physical and matches the configured Space or exact Ctrl+Space chord.
 3. The foreground HWND is a normal Explorer frame and has not changed.
 4. The snapshot is fresh.
 5. UI Automation proves focus is in the file-items selection container, not an Edit,
@@ -47,7 +52,9 @@ preview is visible; otherwise Explorer receives it.
 
 The state machine is `Idle`, `Pending`, `MomentaryOpen`, `StickyOpen`, plus
 `ClosingUntilSpaceUp` so a second sticky-mode Space never leaks an orphan release.
-The hold threshold is one setting (default 200 ms). Repeated downs never transition.
+The hold threshold and tap policy are snapshotted at first key-down (defaults: 200 ms and
+toggle preview). Repeated downs never transition, and changing settings mid-gesture cannot
+leak the matching key-up.
 
 ## Explorer integration
 

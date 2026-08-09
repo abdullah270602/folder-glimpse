@@ -8,11 +8,14 @@ internal enum HookGesture { SpaceDown, SpaceUp, Escape, LostRelease }
 
 internal sealed class KeyboardHook : IDisposable
 {
-    private readonly Func<bool> _canOwnSpace;
+    private readonly Func<bool> _canBeginTrigger;
+    private readonly Func<bool> _isSameEligibleContext;
     private readonly Thread _thread;
     private readonly NativeMethods.LowLevelKeyboardProc _callback;
     private readonly bool _allowInjectedInput;
     private readonly System.Threading.Timer _watchdog;
+    private readonly ManualResetEventSlim _started = new(false);
+    private Exception? _startError;
     private nint _hook;
     private uint _threadId;
     private int _spaceDown;
@@ -26,9 +29,10 @@ internal sealed class KeyboardHook : IDisposable
     internal event Action<HookGesture>? Gesture;
     internal bool CanConsumeEscape { set => Volatile.Write(ref _canConsumeEscape, value ? 1 : 0); }
 
-    internal KeyboardHook(Func<bool> canOwnSpace, bool allowInjectedInput = false)
+    internal KeyboardHook(Func<bool> canBeginTrigger, Func<bool> isSameEligibleContext, bool allowInjectedInput = false)
     {
-        _canOwnSpace = canOwnSpace;
+        _canBeginTrigger = canBeginTrigger;
+        _isSameEligibleContext = isSameEligibleContext;
         _allowInjectedInput = allowInjectedInput;
         _callback = OnKeyboard;
         _thread = new Thread(Run) { IsBackground = true, Name = "FolderPeek keyboard hook" };
@@ -38,6 +42,8 @@ internal sealed class KeyboardHook : IDisposable
     internal void Start()
     {
         _thread.Start();
+        if (!_started.Wait(TimeSpan.FromSeconds(2))) throw new TimeoutException("The keyboard hook did not start in time.");
+        if (_startError is not null) throw new InvalidOperationException("The keyboard hook could not be installed.", _startError);
         _watchdog.Change(500, 500);
     }
 
@@ -45,7 +51,13 @@ internal sealed class KeyboardHook : IDisposable
     {
         _threadId = NativeMethods.GetCurrentThreadId();
         _hook = NativeMethods.SetWindowsHookEx(NativeMethods.WhKeyboardLl, _callback, NativeMethods.GetModuleHandle(null), 0);
-        if (_hook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (_hook == 0)
+        {
+            _startError = new Win32Exception(Marshal.GetLastWin32Error());
+            _started.Set();
+            return;
+        }
+        _started.Set();
         while (NativeMethods.GetMessage(out var message, 0, 0, 0) > 0) { }
         NativeMethods.UnhookWindowsHookEx(_hook);
         _hook = 0;
@@ -66,7 +78,9 @@ internal sealed class KeyboardHook : IDisposable
                     return Volatile.Read(ref _owned) == 1 ? 1 : NativeMethods.CallNextHookEx(_hook, code, wParam, lParam);
                 _downAtTicks = Environment.TickCount64;
                 var injected = (data.Flags & NativeMethods.LlkhfInjected) != 0;
-                var owned = (!injected || _allowInjectedInput) && _canOwnSpace();
+                var owned = false;
+                try { owned = (!injected || _allowInjectedInput) && _canBeginTrigger(); }
+                catch (Exception exception) { if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"eligibility failure: {exception.Message}"); }
                 Volatile.Write(ref _owned, owned ? 1 : 0);
                 if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"space down injected={injected} owned={owned}");
                 if (owned) { Publish(HookGesture.SpaceDown); return 1; }
@@ -79,7 +93,7 @@ internal sealed class KeyboardHook : IDisposable
                 if (owned) { Publish(HookGesture.SpaceUp); return 1; }
             }
         }
-        else if (data.VkCode == NativeMethods.VkEscape && down && Volatile.Read(ref _canConsumeEscape) == 1 && _canOwnSpace())
+        else if (data.VkCode == NativeMethods.VkEscape && down && Volatile.Read(ref _canConsumeEscape) == 1 && SameEligibleContext())
         {
             Publish(HookGesture.Escape);
             return 1;
@@ -87,6 +101,8 @@ internal sealed class KeyboardHook : IDisposable
 
         return NativeMethods.CallNextHookEx(_hook, code, wParam, lParam);
     }
+
+    private bool SameEligibleContext() { try { return _isSameEligibleContext(); } catch { return false; } }
 
     private void WatchForLostRelease(object? _)
     {
@@ -108,15 +124,23 @@ internal sealed class KeyboardHook : IDisposable
 
     private void DrainGestures()
     {
-        while (_pendingGestures.TryDequeue(out var gesture)) Gesture?.Invoke(gesture);
-        Volatile.Write(ref _drainScheduled, 0);
-        if (!_pendingGestures.IsEmpty && Interlocked.Exchange(ref _drainScheduled, 1) == 0)
-            ThreadPool.UnsafeQueueUserWorkItem(static owner => owner.DrainGestures(), this, false);
+        try
+        {
+            while (_pendingGestures.TryDequeue(out var gesture))
+                try { Gesture?.Invoke(gesture); } catch (Exception exception) { if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"gesture failure: {exception.Message}"); }
+        }
+        finally
+        {
+            Volatile.Write(ref _drainScheduled, 0);
+            if (!_pendingGestures.IsEmpty && Interlocked.Exchange(ref _drainScheduled, 1) == 0)
+                ThreadPool.UnsafeQueueUserWorkItem(static owner => owner.DrainGestures(), this, false);
+        }
     }
 
     public void Dispose()
     {
         _watchdog.Dispose();
+        _started.Dispose();
         if (_threadId != 0) NativeMethods.PostThreadMessage(_threadId, 0x0012, 0, 0);
         if (_thread.IsAlive) _thread.Join(1000);
     }

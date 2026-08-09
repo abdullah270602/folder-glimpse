@@ -11,7 +11,12 @@ of the selected File Explorer folder without navigating into it.
 2. In Windows 11 File Explorer, select exactly one normal local folder in the file list.
 3. Tap **Space** to open a sticky preview. Tap **Space** again or press **Escape** to close.
 4. Hold **Space** for about 200 ms to open a momentary preview; release it to close.
-5. Right-click the tray icon to disable FolderPeek temporarily or exit cleanly.
+5. Right-click the tray icon for **Settings…**, startup control, temporary disable, About, or Exit.
+
+Settings are saved automatically in `%LOCALAPPDATA%\FolderPeek\settings.json`. You can
+choose light/dark/system theme, popup dimensions and density, visible metadata, hidden
+files, sorting, initial item limit, Space or Ctrl+Space, hold delay, tap behavior, and
+launch-at-sign-in. **Reset defaults** restores the original behavior.
 
 FolderPeek deliberately passes Space through when Explorer is not foreground, selection
 is ambiguous, a file or multiple items are selected, a text/search/rename field is
@@ -48,11 +53,11 @@ dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-con
 - dedicated `WH_KEYBOARD_LL` thread; no filesystem, COM, UIA, WPF, or blocking work in
   the hook callback
 - explicit, unit-tested tap/hold state machine
-- cancellable off-UI-thread folder inspection capped at 200 initial items
+- cancellable off-UI-thread folder inspection with configurable hidden-file, sort, and limit policies
 - compact ten-row viewport with a rounded theme-aware scrollbar for larger folders
 - native shell icons loaded after names appear, so icon extraction does not delay content
 - per-monitor-V2 physical-pixel positioning and work-area clamping
-- system light/dark color selection and a tray enable/exit menu
+- live system/light/dark theming, atomic JSON settings, and HKCU launch-at-sign-in control
 
 See [the architecture decision](docs/architecture.md) and
 [manual integration checklist/results](docs/manual-testing.md).

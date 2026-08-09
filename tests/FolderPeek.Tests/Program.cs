@@ -1,6 +1,7 @@
 using FolderPeek.Core;
 using FolderPeek.Core.FolderInspection;
 using FolderPeek.Core.Input;
+using FolderPeek.Core.Settings;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
@@ -8,6 +9,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Input eligibility policy", TestEligibility),
     ("Explorer focus ancestry policy", TestExplorerFocusPolicy),
     ("Folder enumeration", TestEnumeration),
+    ("Settings persistence and recovery", TestSettings),
     ("Popup positioning", TestPositioning)
 };
 
@@ -57,6 +59,12 @@ static Task TestStateMachine()
     Equal(PeekState.ClosingUntilSpaceUp, invalidated.State, "invalidated owned hold waits for up");
     Equal(PeekAction.Close, invalidated.Action, "invalidated hold closes");
     True(machine.SpaceUp().Suppress, "matching up remains suppressed");
+
+    machine = new PeekStateMachine();
+    machine.SpaceDown(true, TapBehavior.MomentaryOnly);
+    var momentaryTap = machine.SpaceUp();
+    Equal(PeekState.Idle, momentaryTap.State, "momentary-only tap stays closed");
+    True(momentaryTap.Suppress, "momentary-only tap remains an owned gesture");
     return Task.CompletedTask;
 }
 
@@ -132,6 +140,23 @@ static async Task TestEnumeration()
         Equal(7, capped.Entries.Count, "large directory capped");
         True(capped.HasMore, "large directory reports more");
 
+        var globallySorted = await inspector.InspectAsync(root, new FolderInspectionOptions(ItemLimit: 20), CancellationToken.None);
+        Equal("FolderA", globallySorted.Entries[0].Name, "limit is applied after global sort");
+        var newestPath = Path.Combine(root, "newest.zzz");
+        await File.WriteAllTextAsync(newestPath, "new");
+        File.SetLastWriteTimeUtc(newestPath, DateTime.UtcNow.AddMinutes(2));
+        var modified = await inspector.InspectAsync(root, new FolderInspectionOptions(SortMode: SortMode.ModifiedDate, FoldersFirst: false, ItemLimit: 20), CancellationToken.None);
+        Equal("newest.zzz", modified.Entries[0].Name, "modified sort is newest first");
+
+        var hiddenPath = Path.Combine(root, "hidden.txt");
+        await File.WriteAllTextAsync(hiddenPath, "secret");
+        File.SetAttributes(hiddenPath, File.GetAttributes(hiddenPath) | FileAttributes.Hidden);
+        var hiddenOff = await inspector.InspectAsync(root, new FolderInspectionOptions(ItemLimit: null), CancellationToken.None);
+        False(hiddenOff.Entries.Any(x => x.Name == "hidden.txt"), "hidden entries excluded by default");
+        var hiddenOn = await inspector.InspectAsync(root, new FolderInspectionOptions(ShowHiddenFiles: true, ItemLimit: null), CancellationToken.None);
+        True(hiddenOn.Entries.Any(x => x.Name == "hidden.txt"), "hidden entries included when enabled");
+        File.SetAttributes(hiddenPath, FileAttributes.Normal);
+
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
         await ThrowsAsync<OperationCanceledException>(() => inspector.InspectAsync(root, 10, canceled.Token), "pre-cancelled inspection");
@@ -141,10 +166,42 @@ static async Task TestEnumeration()
     finally { Directory.Delete(root, true); }
 }
 
+static Task TestSettings()
+{
+    var root = Path.Combine(Path.GetTempPath(), "FolderPeek.Settings.Tests", Guid.NewGuid().ToString("N"));
+    var path = Path.Combine(root, "settings.json");
+    try
+    {
+        var service = new JsonSettingsService(path);
+        service.Load();
+        True(File.Exists(path), "missing settings file is created");
+        Equal(430d, service.Current.PopupWidth, "defaults loaded");
+        True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100 }, out _), "settings update persists");
+        var reloaded = new JsonSettingsService(path); reloaded.Load();
+        Equal(ThemePreference.Dark, reloaded.Current.Theme, "enum round trips");
+        Equal(612d, reloaded.Current.PopupWidth, "number round trips");
+
+        File.WriteAllText(path, "{ \"showFileSize\": false, \"unknownFutureField\": 123 }");
+        reloaded.Load();
+        False(reloaded.Current.ShowFileSize, "partial boolean is retained");
+        Equal(430d, reloaded.Current.PopupWidth, "missing partial values use defaults");
+
+        File.WriteAllText(path, "{ not-json");
+        reloaded.Load();
+        Equal(FolderPeekSettings.Default, reloaded.Current, "malformed settings recover to defaults");
+        True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17 }, out _), "invalid values normalize");
+        Equal(700d, reloaded.Current.PopupWidth, "width clamps high");
+        Equal(100, reloaded.Current.HoldThresholdMs, "hold delay clamps low");
+        Equal(50, reloaded.Current.InitialItemLimit, "unsupported item limit resets");
+    }
+    finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    return Task.CompletedTask;
+}
+
 static Task TestPositioning()
 {
-    Equal(10, AppSettings.Default.PreviewVisibleRows, "default preview shows ten rows");
-    True(AppSettings.Default.PreviewRowHeightDip > 0, "preview row height is positive");
+    Equal(10, FolderPeekSettings.Default.PreviewVisibleRows, "default preview shows ten rows");
+    True(FolderPeekSettings.Default.PreviewRowHeightDip > 0, "preview row height is positive");
     var work = new PixelRect(0, 0, 1920, 1040);
     var right = PopupPositioner.Place(new PixelRect(100, 100, 300, 140), work, new PixelSize(430, 500));
     Equal(310, right.Left, "uses right side when available");

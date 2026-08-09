@@ -1,5 +1,7 @@
 namespace FolderPeek.Core.Input;
 
+using FolderPeek.Core.Settings;
+
 public enum PeekState
 {
     Idle,
@@ -21,10 +23,11 @@ public readonly record struct StateTransition(bool Suppress, PeekAction Action, 
 
 public sealed class PeekStateMachine
 {
+    private TapBehavior _pendingTapBehavior = TapBehavior.TogglePreview;
     public PeekState State { get; private set; }
     public bool OwnsSpaceGesture => State is PeekState.Pending or PeekState.MomentaryOpen or PeekState.ClosingUntilSpaceUp;
 
-    public StateTransition SpaceDown(bool eligible)
+    public StateTransition SpaceDown(bool eligible, TapBehavior tapBehavior = TapBehavior.TogglePreview)
     {
         if (OwnsSpaceGesture)
         {
@@ -43,6 +46,7 @@ public sealed class PeekStateMachine
         }
 
         State = PeekState.Pending;
+        _pendingTapBehavior = tapBehavior;
         return Result(true);
     }
 
@@ -62,6 +66,11 @@ public sealed class PeekStateMachine
         switch (State)
         {
             case PeekState.Pending:
+                if (_pendingTapBehavior == TapBehavior.MomentaryOnly)
+                {
+                    State = PeekState.Idle;
+                    return Result(true);
+                }
                 State = PeekState.StickyOpen;
                 return Result(true, PeekAction.OpenSticky);
             case PeekState.MomentaryOpen:

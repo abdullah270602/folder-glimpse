@@ -12,11 +12,14 @@ public sealed class PreviewViewModel : INotifyPropertyChanged
     private string _folderPath = string.Empty;
     private string _status = string.Empty;
     private bool _loading;
+    private bool _showPath = true;
 
     public ObservableCollection<PreviewEntryViewModel> Entries { get; } = new();
     public string FolderName { get => _folderName; set => Set(ref _folderName, value); }
     public string FolderPath { get => _folderPath; set => Set(ref _folderPath, value); }
     public string Status { get => _status; set => Set(ref _status, value); }
+    public bool ShowPath { get => _showPath; set { if (Set(ref _showPath, value)) Changed(nameof(PathVisibility)); } }
+    public Visibility PathVisibility => ShowPath ? Visibility.Visible : Visibility.Collapsed;
     public bool Loading { get => _loading; set { if (Set(ref _loading, value)) { Changed(nameof(LoadingVisibility)); Changed(nameof(EmptyVisibility)); } } }
     public Visibility LoadingVisibility => Loading ? Visibility.Visible : Visibility.Collapsed;
     public Visibility EmptyVisibility => !Loading && Entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -33,14 +36,20 @@ public sealed class PreviewViewModel : INotifyPropertyChanged
 
 public sealed class PreviewEntryViewModel
 {
-    public PreviewEntryViewModel(string name, string detail, BitmapSource? icon)
+    public PreviewEntryViewModel(string name, string sizeText, string modifiedText, bool showSize, bool showModified, BitmapSource? icon)
     {
         Name = name;
-        Detail = detail;
+        SizeText = sizeText;
+        ModifiedText = modifiedText;
+        SizeVisibility = showSize && sizeText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ModifiedVisibility = showModified ? Visibility.Visible : Visibility.Collapsed;
         Icon = icon;
     }
 
     public string Name { get; }
-    public string Detail { get; }
+    public string SizeText { get; }
+    public string ModifiedText { get; }
+    public Visibility SizeVisibility { get; }
+    public Visibility ModifiedVisibility { get; }
     public BitmapSource? Icon { get; }
 }

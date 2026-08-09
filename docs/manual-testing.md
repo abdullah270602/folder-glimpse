@@ -8,7 +8,7 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Check | Result |
 |---|---|
 | Debug solution build | Pass, 0 warnings / 0 errors |
-| Automated test executable | Pass, 5/5 suites |
+| Automated test executable | Pass, 6/6 suites |
 | App process startup smoke test | Pass |
 | Windows 11 Explorer selection/focus snapshot | Pass against `UIItem` → `UIItemsView` → `CabinetWClass` ancestry |
 | Sticky tap / second-tap close | Pass in live Explorer |
@@ -17,6 +17,8 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Explorer search safety | Pass; Space was inserted into search and no popup appeared |
 | Rendered names/icons/sizes | Pass; captured in `artifacts/live-preview-final.png` during development |
 | Mixed-DPI/light-dark visual inspection | Not run |
+| Settings missing/partial/malformed recovery | Pass (automated) |
+| Hidden, modified-date, global-limit sorting | Pass (automated) |
 
 The desktop-control service could not enumerate Windows (`EnumWindows` returned
 `0x80070003`), so validation used direct Windows UI Automation, Shell automation, and an
@@ -68,6 +70,15 @@ folders and opens nothing automatically.
 - [ ] Verify the popup does not activate Explorer, enter Alt+Tab, cover unrelated foreground
       apps after focus changes, or remain topmost after session lock/unlock.
 - [ ] Toggle **Enabled** off in the tray; verify Space always passes. Toggle on and retest.
+- [ ] Open **Settings…** and exercise every control; restart and verify values persisted.
+- [ ] Change System/Light/Dark while the popup and Settings are open; verify immediate readable updates.
+- [ ] Test Space and exact Ctrl+Space modes, 100/600 ms hold limits, Toggle and Momentary Only.
+- [ ] Verify 20/50/100/200/All limits, hidden-file filtering, all sort modes, folders-first,
+      compact/comfortable density, path/size/date visibility, width, and height.
+- [ ] Toggle **Launch at startup** from both Settings and tray; verify synchronized state and
+      the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry, then disable it.
+- [ ] Replace settings.json with empty, partial, malformed, and out-of-range content; verify
+      safe recovery without a crash and a healed complete file.
 - [ ] Choose **Exit**; verify the process and hook terminate cleanly.
 
 Record Windows build, Explorer version, display layout/scales, and any failed eligibility
