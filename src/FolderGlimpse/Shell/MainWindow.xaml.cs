@@ -42,7 +42,6 @@ public partial class MainWindow : Window, IDisposable
         _howToUse = new HowToUseView(_viewModel);
         _about = new AboutView();
         _welcome = new WelcomeView(startup.IsEnabled);
-        _home.SettingsRequested += () => Navigate(ShellSection.Settings);
         _settings.HomeRequested += () => Navigate(ShellSection.Home);
         _welcome.GetStartedRequested += CompleteOnboarding;
         Closing += WindowClosing;

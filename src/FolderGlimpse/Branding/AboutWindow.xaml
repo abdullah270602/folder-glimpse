@@ -4,7 +4,7 @@
         xmlns:branding="clr-namespace:FolderGlimpse.Branding"
         Background="{DynamicResource WindowBrush}" UseLayoutRounding="True" SnapsToDevicePixels="True">
   <Grid Margin="30,26,30,22">
-    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="1" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="1" /><RowDefinition Height="*" /></Grid.RowDefinitions>
     <Grid Margin="0,0,0,22">
       <Grid.ColumnDefinitions><ColumnDefinition Width="60" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
       <branding:BrandMark Width="48" Height="48" VerticalAlignment="Center" />
@@ -21,11 +21,6 @@
       <TextBlock Text="FolderGlimpse is a lightweight Windows utility for quickly inspecting folder contents from File Explorer."
                  FontSize="13" LineHeight="20" TextWrapping="Wrap" />
       <TextBlock x:Name="VersionText" Margin="0,18,0,0" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
-    </StackPanel>
-    <StackPanel Grid.Row="3" Orientation="Horizontal">
-      <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="12" Padding="10,5" Margin="0,0,8,0"><TextBlock Text="Lightweight" FontSize="11" /></Border>
-      <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="12" Padding="10,5" Margin="0,0,8,0"><TextBlock Text="Local" FontSize="11" /></Border>
-      <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="12" Padding="10,5"><TextBlock Text="Built for Windows" FontSize="11" /></Border>
     </StackPanel>
   </Grid>
 </UserControl>

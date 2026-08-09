@@ -36,8 +36,6 @@ internal sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string TapTitle => _settings.Current.TapBehavior == TapBehavior.MomentaryOnly ? "Tap disabled" : $"Tap {ShortcutText}";
     public string TapDescription => _settings.Current.TapBehavior == TapBehavior.MomentaryOnly ? "Hold the shortcut to preview" : "Keep a glimpse open";
     public string HoldTitle => $"Hold {ShortcutText}";
-    public string StartupText => _startup.IsEnabled ? "On" : "Off";
-    public string ThemeText => _settings.Current.Theme switch { ThemePreference.Light => "Light", ThemePreference.Dark => "Dark", _ => "System" };
 
     internal void Refresh()
     {
@@ -50,8 +48,6 @@ internal sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(TapTitle));
             OnPropertyChanged(nameof(TapDescription));
             OnPropertyChanged(nameof(HoldTitle));
-            OnPropertyChanged(nameof(StartupText));
-            OnPropertyChanged(nameof(ThemeText));
         }
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher is not null && !dispatcher.CheckAccess()) dispatcher.BeginInvoke(Raise); else Raise();
