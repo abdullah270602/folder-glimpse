@@ -6,9 +6,11 @@
     <SolidColorBrush x:Key="PanelBrush" Color="#F7F7F7"/><SolidColorBrush x:Key="TextBrush" Color="#171717"/>
     <SolidColorBrush x:Key="SubtleTextBrush" Color="#666666"/><SolidColorBrush x:Key="LineBrush" Color="#18000000"/>
     <SolidColorBrush x:Key="ControlBrush" Color="White"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#171717"/>
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Style>
     <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Margin" Value="0,6"/></Style>
-    <Style TargetType="ComboBox"><Setter Property="MinWidth" Value="170"/><Setter Property="Padding" Value="7,4"/></Style>
+    <Style TargetType="ComboBox"><Setter Property="MinWidth" Value="170"/><Setter Property="Padding" Value="7,4"/><Setter Property="IsEditable" Value="True"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="Foreground" Value="#171717"/><Setter Property="TextElement.Foreground" Value="#171717"/><Setter Property="Background" Value="White"/></Style>
+    <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="#171717"/><Setter Property="Background" Value="White"/></Style>
   </Window.Resources>
   <Grid Margin="28,22">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
