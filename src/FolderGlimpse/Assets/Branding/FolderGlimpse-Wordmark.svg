@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 92">
+  <g transform="translate(4 14) scale(.9)">
+    <path d="M5 17a5 5 0 0 1 5-5h16l6 7h21a5 5 0 0 1 5 5v24a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z" fill="none" stroke="#2563EB" stroke-width="4.25" stroke-linejoin="round"/>
+    <rect x="30" y="27" width="30" height="33" rx="4" fill="#F8FAFC" stroke="#0F172A" stroke-width="3.25"/>
+    <path d="M37 38h16" stroke="#2563EB" stroke-width="3.25" stroke-linecap="round"/><path d="M37 46h13M37 53h10" stroke="#94A3B8" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="78" y="62" font-family="Segoe UI Variable, Segoe UI, sans-serif" font-size="48" font-weight="500" fill="#0F172A">Folder<tspan fill="#2563EB">Glimpse</tspan></text>
+</svg>

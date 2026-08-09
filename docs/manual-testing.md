@@ -46,17 +46,17 @@ From the repository root:
 ./scripts/Create-TestFolders.ps1
 ```
 
-This creates `%TEMP%\FolderPeekTest` with empty, small, many-item, and deep-but-nonrecursive
+This creates `%TEMP%\FolderGlimpseTest` with empty, small, many-item, and deep-but-nonrecursive
 folders and opens nothing automatically.
 
 ## Required release gate
 
-- [ ] Launch the self-contained `FolderPeek.exe`; verify one tray icon and no taskbar entry.
-- [ ] Open `%TEMP%\FolderPeekTest` in normal, non-elevated File Explorer.
+- [ ] Launch the self-contained `FolderGlimpse.exe`; verify one tray icon and no taskbar entry.
+- [ ] Open `%TEMP%\FolderGlimpseTest` in normal, non-elevated File Explorer.
 - [ ] Select `Small`, tap Space, and verify a sticky popup appears beside the selected row.
 - [ ] Single-click a file; verify it highlights without opening. Double-click it and verify
       its configured Windows application opens.
-- [ ] Double-click a child folder; verify File Explorer opens it without changing FolderPeek
+- [ ] Double-click a child folder; verify File Explorer opens it without changing FolderGlimpse
       into an internal navigation view.
 - [ ] Use Up/Down, Enter, Escape, Ctrl+A, Ctrl-click, and Shift-click in sticky mode; verify
       standard selection and activation behavior.
@@ -71,13 +71,13 @@ folders and opens nothing automatically.
 - [ ] Tap Space again; verify the popup closes and no subsequent key-up affects Explorer.
 - [ ] Select `Small`, hold Space; verify the popup opens at roughly 200 ms and closes on release.
 - [ ] Press/hold Space through Windows key repeat; verify only one popup transition occurs.
-- [ ] Select `README.md`; press Space; verify FolderPeek does nothing and Explorer receives Space.
+- [ ] Select `README.md`; press Space; verify FolderGlimpse does nothing and Explorer receives Space.
 - [ ] Select multiple items; verify Space passes through.
 - [ ] Click Explorer search and type several words with spaces; verify zero interception.
 - [ ] Rename a folder and type a name containing spaces; verify zero interception.
 - [ ] Focus the address bar, navigation tree, command bar, preview pane, and a context menu;
       verify Space is never consumed.
-- [ ] Open Notepad and type/hold Space; verify FolderPeek does nothing.
+- [ ] Open Notepad and type/hold Space; verify FolderGlimpse does nothing.
 - [ ] Hold Space over an eligible folder, Alt+Tab before release, then release; verify the
       popup closes and the destination app does not receive repeats or an orphan release.
 - [ ] Preview `Empty`; verify a clear empty state.
@@ -87,7 +87,7 @@ folders and opens nothing automatically.
 - [ ] Delete or rename the selected folder while preview is loading; verify no crash or stale popup.
 - [ ] Switch Explorer tabs immediately before Space. Repeat with two tabs selecting folders
       that have the same leaf name; ambiguous input must pass through.
-- [ ] Restart Explorer while FolderPeek runs; verify no crash and recovery after a new safe snapshot.
+- [ ] Restart Explorer while FolderGlimpse runs; verify no crash and recovery after a new safe snapshot.
 - [ ] Test Windows light and dark app mode; verify readable text/borders.
 - [ ] Test 100%, 125%, 150%, and, if available, mixed-DPI monitors. Include a monitor left of
       the primary and taskbars on different edges. Verify the popup stays in the work area.

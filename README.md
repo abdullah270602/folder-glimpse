@@ -1,13 +1,17 @@
-# FolderPeek
+# FolderGlimpse
 
-FolderPeek is a lightweight Windows 11 tray utility that previews the immediate contents
-of the selected File Explorer folder without navigating into it.
+**Glance inside folders without opening them, and so much more.**
 
-![FolderPeek screenshot placeholder](docs/screenshot-placeholder.svg)
+FolderGlimpse is a lightweight Windows utility that lets you quickly inspect the contents
+of a folder directly from File Explorer without navigating into it.
+
+Select a folder, press Space, and glimpse what's inside.
+
+![FolderGlimpse screenshot placeholder](docs/screenshot-placeholder.svg)
 
 ## Use it
 
-1. Launch `FolderPeek.exe`. It stays in the notification area.
+1. Launch `FolderGlimpse.exe`. It stays in the notification area.
 2. In Windows 11 File Explorer, select exactly one normal local folder in the file list.
 3. Tap **Space** to open a sticky preview. Tap **Space** again or press **Escape** to close.
 4. Hold **Space** for about 200 ms to open a momentary preview; release it to close.
@@ -15,17 +19,17 @@ of the selected File Explorer folder without navigating into it.
    selection, or right-click for safe Open, Copy path, location, and Properties actions.
 6. Right-click the tray icon for **Settings…**, startup control, temporary disable, About, or Exit.
 
-Settings are saved automatically in `%LOCALAPPDATA%\FolderPeek\settings.json`. You can
+Settings are saved automatically in `%LOCALAPPDATA%\FolderGlimpse\settings.json`. You can
 choose light/dark/system theme, popup dimensions and density, visible metadata, hidden
 files, sorting, initial item limit, Space or Ctrl+Space, hold delay, tap behavior, and
 launch-at-sign-in. Interaction settings control activation, multi-selection, optional
 selection checkboxes, open-many confirmation, and whether the popup closes after opening.
 **Reset defaults** restores the original behavior.
 
-FolderPeek deliberately passes Space through when Explorer is not foreground, selection
+FolderGlimpse deliberately passes Space through when Explorer is not foreground, selection
 is ambiguous, a file or multiple items are selected, a text/search/rename field is
 focused, a modifier is held, or its Explorer snapshot is stale. Plain Space does have an
-Explorer selection meaning, so FolderPeek only overrides it in the narrow eligible case.
+Explorer selection meaning, so FolderGlimpse only overrides it in the narrow eligible case.
 
 ## Build
 
@@ -33,21 +37,21 @@ Requirements: Windows 11 x64 and the [.NET 8 SDK](https://dotnet.microsoft.com/d
 No third-party NuGet packages are used.
 
 ```powershell
-dotnet restore FolderPeek.sln
-dotnet build FolderPeek.sln -c Release
-dotnet run --project tests/FolderPeek.Tests/FolderPeek.Tests.csproj -c Release
+dotnet restore FolderGlimpse.sln
+dotnet build FolderGlimpse.sln -c Release
+dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release
 ```
 
 Create a framework-dependent build:
 
 ```powershell
-dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-contained false -o artifacts/FolderPeek-win-x64
+dotnet publish src/FolderGlimpse/FolderGlimpse.csproj -c Release -r win-x64 --self-contained false -o artifacts/FolderGlimpse-win-x64
 ```
 
 Create the preferred self-contained single-file build:
 
 ```powershell
-dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/FolderPeek-win-x64-self-contained
+dotnet publish src/FolderGlimpse/FolderGlimpse.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/FolderGlimpse-win-x64-self-contained
 ```
 
 ## Design
@@ -90,13 +94,13 @@ See [the architecture decision](docs/architecture.md) and
   already-selected row may leave a sticky preview open. Space or Escape always closes it.
 - High contrast is not specially styled yet. The app follows light/dark app mode.
 
-FolderPeek works offline, performs no telemetry, does not modify previewed folders, and
+FolderGlimpse works offline, performs no telemetry, does not modify previewed folders, and
 does not require administrator privileges.
 
 ### Diagnostics
 
-If Explorer integration needs troubleshooting, start FolderPeek from PowerShell with
-`--diagnostics`. It writes `%LOCALAPPDATA%\FolderPeek\diagnostics.log`. The additional
+If Explorer integration needs troubleshooting, start FolderGlimpse from PowerShell with
+`--diagnostics`. It writes `%LOCALAPPDATA%\FolderGlimpse\diagnostics.log`. The additional
 `--allow-injected-input` switch exists only for automated integration testing; normal
 launches continue rejecting injected keyboard events.
 

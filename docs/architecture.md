@@ -1,10 +1,18 @@
-# FolderPeek architecture decision
+# FolderGlimpse architecture decision
 
 Status: accepted for V1 (2026-08-09)
 
+## Product identity and upgrades
+
+FolderGlimpse uses a `Local\FolderGlimpse.SingleInstance` mutex. During an in-place
+upgrade, close any still-running legacy version before starting FolderGlimpse; the old
+and new executables use different mutex names and could otherwise both install keyboard
+hooks for that one session. Settings and launch-at-sign-in registrations are migrated
+automatically from the legacy identity, without overwriting newer FolderGlimpse settings.
+
 ## Decision
 
-FolderPeek is a separate, non-elevated .NET 8 WPF process. It does not inject into
+FolderGlimpse is a separate, non-elevated .NET 8 WPF process. It does not inject into
 Explorer. Four isolated areas are joined by immutable records and small interfaces:
 
 - `ExplorerIntegration` produces a conservative `ExplorerSnapshot`. Win32 identifies
@@ -35,14 +43,14 @@ integration and state decisions.
 ## Input ownership and safety
 
 Suppression is synchronous: Windows requires the hook to pass or consume the first key
-down before tap versus hold is known. FolderPeek therefore decides ownership once, on
+down before tap versus hold is known. FolderGlimpse therefore decides ownership once, on
 the first physical unmodified Space down, and keeps that decision through the matching
 up. A consumed down implies repeats and up are consumed. A passed down implies repeats
 and up are passed.
 
 Eligibility requires all of the following:
 
-1. FolderPeek is enabled.
+1. FolderGlimpse is enabled.
 2. The event is physical and matches the configured Space or exact Ctrl+Space chord.
 3. The foreground HWND is a normal Explorer frame and has not changed.
 4. The snapshot is fresh.
@@ -80,12 +88,12 @@ but missing focus proof makes the entire snapshot ineligible.
 
 Windows 11 tabs are a known Shell-API ambiguity: frame HWND alone is insufficient.
 Matching the foreground HWND, active automation tree, selection, and rechecking the
-foreground mitigates it. If multiple candidates cannot be distinguished, FolderPeek
+foreground mitigates it. If multiple candidates cannot be distinguished, FolderGlimpse
 passes Space.
 
 ## UI and DPI
 
-WPF was chosen over WinUI 3. FolderPeek's difficult work is HWND/COM/UIA interop, for
+WPF was chosen over WinUI 3. FolderGlimpse's difficult work is HWND/COM/UIA interop, for
 which WinUI provides no simplification, while Windows App SDK would add deployment and
 bootstrap complexity. The popup always uses `WS_EX_TOOLWINDOW`. Momentary/read-only mode
 additionally uses `WS_EX_NOACTIVATE`, `ShowActivated=false`, and
@@ -138,7 +146,7 @@ and rounded-corner attributes when the menu opens. High-contrast mode maps to sy
 - UIA rectangles may be stale, off-screen, or full-row width. Cursor fallback is used.
 - Open-file-location currently opens the containing folder without selecting the child.
 - Full native Explorer shell-extension context menus and internal folder navigation remain
-  deliberately out of scope; FolderPeek exposes only its small non-destructive action set.
+  deliberately out of scope; FolderGlimpse exposes only its small non-destructive action set.
 - The hosted development environment's Shell automation probe returned Access Denied, so
   Explorer selection/tab behavior requires the manual checklist in `docs/manual-testing.md`.
 

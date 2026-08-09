@@ -1,0 +1,118 @@
+<Window x:Class="FolderGlimpse.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:branding="clr-namespace:FolderGlimpse.Branding"
+        Title="FolderGlimpse Settings" Width="640" Height="760" MinWidth="580" MinHeight="640"
+        ShowInTaskbar="False" WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBrush}" UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid Margin="30,24,30,20">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="60" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+      <branding:BrandMark Width="48" Height="48" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+        <TextBlock FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="26" FontWeight="SemiBold">
+          <Run Text="Folder" /><Run Text="Glimpse" Foreground="{DynamicResource BrandBlueBrush}" />
+        </TextBlock>
+        <TextBlock Text="Glance inside folders without opening them, and so much more." Style="{StaticResource SettingDescriptionStyle}" Margin="0,2,0,0" />
+      </StackPanel>
+    </Grid>
+
+    <ScrollViewer x:Name="MainScrollViewer" Grid.Row="1" Margin="24,0,12,0"
+                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="6,0,12,24">
+        <TextBlock Text="Appearance" Style="{StaticResource SectionTitleStyle}" />
+
+        <Border Style="{StaticResource SettingsCardStyle}">
+          <Grid Margin="16,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="App theme" Style="{StaticResource SettingTitleStyle}" />
+              <TextBlock Text="Use the Windows theme or choose a fixed appearance" Style="{StaticResource SettingDescriptionStyle}" />
+            </StackPanel>
+            <ComboBox x:Name="ThemeBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="App theme" SelectionChanged="SettingChanged" />
+          </Grid>
+        </Border>
+
+        <Border Style="{StaticResource SettingsCardStyle}">
+          <Grid Margin="16,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="230" /></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="Popup width" Style="{StaticResource SettingTitleStyle}" />
+              <TextBlock Text="Controls the preview panel width" Style="{StaticResource SettingDescriptionStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="20,0,0,0">
+              <TextBlock x:Name="WidthLabel" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
+              <Slider x:Name="WidthSlider" AutomationProperties.Name="Popup width" Minimum="300" Maximum="700" TickFrequency="10" IsSnapToTickEnabled="True" ValueChanged="SettingChanged" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Style="{StaticResource SettingsCardStyle}">
+          <Grid Margin="16,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="230" /></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="Maximum height" Style="{StaticResource SettingTitleStyle}" />
+              <TextBlock Text="Limits how tall a large preview can grow" Style="{StaticResource SettingDescriptionStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="20,0,0,0">
+              <TextBlock x:Name="HeightLabel" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
+              <Slider x:Name="HeightSlider" AutomationProperties.Name="Maximum height" Minimum="250" Maximum="900" TickFrequency="10" IsSnapToTickEnabled="True" ValueChanged="SettingChanged" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Style="{StaticResource SettingsCardStyle}">
+          <Grid Margin="16,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center"><TextBlock Text="Display density" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Choose roomier or tighter preview rows" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel>
+            <ComboBox x:Name="DensityBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="Display density" SelectionChanged="SettingChanged" />
+          </Grid>
+        </Border>
+
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="PathCheck" Margin="16,11" AutomationProperties.Name="Show full folder path" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Show full folder path" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Display the complete path below the folder name" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="SizeCheck" Margin="16,11" AutomationProperties.Name="Show file sizes" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Show file sizes" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Show a compact size value beside files" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border Style="{StaticResource SettingsCardStyle}" Margin="0,0,0,24"><CheckBox x:Name="DateCheck" Margin="16,11" AutomationProperties.Name="Show modified dates" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Show modified dates" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Include each item's latest modified date" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+
+        <TextBlock Text="Contents" Style="{StaticResource SectionTitleStyle}" />
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="HiddenCheck" Margin="16,11" AutomationProperties.Name="Show hidden files" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Show hidden files" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Include items marked hidden by Windows" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="FoldersCheck" Margin="16,11" AutomationProperties.Name="Folders first" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Folders first" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Group folders before files in the preview" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Sort items by" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Choose the primary ordering for preview contents" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><ComboBox x:Name="SortBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="Sort items by" SelectionChanged="SettingChanged" /></Grid></Border>
+        <Border Style="{StaticResource SettingsCardStyle}" Margin="0,0,0,24"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Initial item limit" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Keep very large folders quick and responsive" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><ComboBox x:Name="LimitBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="Initial item limit" SelectionChanged="SettingChanged" /></Grid></Border>
+
+        <TextBlock x:Name="InteractionHeading" Text="Interaction" Style="{StaticResource SectionTitleStyle}" />
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="InteractiveCheck" Margin="16,11" AutomationProperties.Name="Interactive items" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Interactive items" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Select and open items in sticky previews" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="DoubleFileCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="DoubleFileCheck" Margin="16,11" AutomationProperties.Name="Double-click files to open" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Double-click files to open" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Open files using their normal Windows app" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="DoubleFolderCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="DoubleFolderCheck" Margin="16,11" AutomationProperties.Name="Double-click folders to open in Explorer" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Double-click folders to open in Explorer" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Open folders normally without navigating inside FolderGlimpse" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="RightClickCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="RightClickCheck" Margin="16,11" AutomationProperties.Name="Right-click actions" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Right-click actions" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Show Open, Copy path, location, and Properties actions" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="MultiCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="MultiCheck" Margin="16,11" AutomationProperties.Name="Multi-selection" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Multi-selection" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Use Ctrl, Shift, or Ctrl+A to select several items" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="CheckboxCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="SelectionCheckboxCheck" Margin="16,11" AutomationProperties.Name="Show selection checkboxes" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Show selection checkboxes" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Add a checkbox that uses the same row selection" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="AllowMultiCard" Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="AllowMultiOpenCheck" Margin="16,11" AutomationProperties.Name="Allow opening multiple items" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Allow opening multiple items" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Open every selected file and folder with one action" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+        <Border x:Name="ConfirmCard" Style="{StaticResource SettingsCardStyle}"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="230" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Confirm before opening more than" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Ask before a large group of apps or windows opens" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><StackPanel Grid.Column="1" Margin="20,0,0,0"><TextBlock x:Name="ConfirmLabel" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" /><Slider x:Name="ConfirmSlider" AutomationProperties.Name="Confirm before opening more than" Minimum="2" Maximum="50" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="SettingChanged" /></StackPanel></Grid></Border>
+        <Border x:Name="CloseAfterCard" Style="{StaticResource SettingsCardStyle}" Margin="0,0,0,24"><CheckBox x:Name="CloseAfterOpenCheck" Margin="16,11" AutomationProperties.Name="Close preview after opening" Checked="SettingChanged" Unchecked="SettingChanged"><StackPanel><TextBlock Text="Close preview after opening" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Dismiss FolderGlimpse after an item launches" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+
+        <TextBlock Text="Input and Windows" Style="{StaticResource SectionTitleStyle}" />
+        <Border Style="{StaticResource SettingsCardStyle}"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Preview shortcut" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="The key gesture used while a folder is selected" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><ComboBox x:Name="HotkeyBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="Preview shortcut" SelectionChanged="SettingChanged" /></Grid></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Tap behavior" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Toggle a sticky preview or require a hold" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><ComboBox x:Name="TapBox" Grid.Column="1" Margin="20,0,0,0" AutomationProperties.Name="Tap behavior" SelectionChanged="SettingChanged" /></Grid></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><Grid Margin="16,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="230" /></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock Text="Hold delay" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="How long to hold before momentary preview opens" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel><StackPanel Grid.Column="1" Margin="20,0,0,0"><TextBlock x:Name="HoldLabel" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" /><Slider x:Name="HoldSlider" AutomationProperties.Name="Hold delay" Minimum="100" Maximum="600" TickFrequency="25" IsSnapToTickEnabled="True" ValueChanged="SettingChanged" /></StackPanel></Grid></Border>
+        <Border Style="{StaticResource SettingsCardStyle}"><CheckBox x:Name="StartupCheck" Margin="16,11" AutomationProperties.Name="Launch at sign-in" Checked="StartupChanged" Unchecked="StartupChanged"><StackPanel><TextBlock Text="Launch at sign-in" Style="{StaticResource SettingTitleStyle}" /><TextBlock Text="Start FolderGlimpse automatically with Windows" Style="{StaticResource SettingDescriptionStyle}" /></StackPanel></CheckBox></Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0">
+      <Grid Margin="30,14">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBlock x:Name="ErrorText" Foreground="#D13438" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button Content="Reset to defaults" Margin="0,0,10,0" Click="ResetClicked" />
+          <Button Content="Done" IsDefault="True" MinWidth="92" Style="{StaticResource PrimaryButtonStyle}" Click="DoneClicked" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

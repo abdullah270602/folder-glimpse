@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>FolderGlimpse.Core</AssemblyName>
+    <RootNamespace>FolderGlimpse.Core</RootNamespace>
+    <Product>FolderGlimpse</Product>
+    <Description>Glance inside folders without opening them, and so much more.</Description>
+  </PropertyGroup>
+</Project>
