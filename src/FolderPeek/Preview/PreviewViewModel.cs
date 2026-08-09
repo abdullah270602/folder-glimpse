@@ -6,7 +6,7 @@ using System.Windows.Media.Imaging;
 
 namespace FolderPeek.Preview;
 
-internal sealed class PreviewViewModel : INotifyPropertyChanged
+public sealed class PreviewViewModel : INotifyPropertyChanged
 {
     private string _folderName = string.Empty;
     private string _folderPath = string.Empty;
@@ -31,4 +31,16 @@ internal sealed class PreviewViewModel : INotifyPropertyChanged
     private void Changed(string? name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-internal sealed record PreviewEntryViewModel(string Name, string Detail, BitmapSource? Icon);
+public sealed class PreviewEntryViewModel
+{
+    public PreviewEntryViewModel(string name, string detail, BitmapSource? icon)
+    {
+        Name = name;
+        Detail = detail;
+        Icon = icon;
+    }
+
+    public string Name { get; }
+    public string Detail { get; }
+    public BitmapSource? Icon { get; }
+}
