@@ -7,9 +7,11 @@ using System.Windows.Threading;
 using FolderPeek.Core;
 using FolderPeek.Core.FolderInspection;
 using FolderPeek.Core.Input;
+using FolderPeek.Core.Interaction;
 using FolderPeek.Core.Settings;
 using FolderPeek.ExplorerIntegration;
 using FolderPeek.Input;
+using FolderPeek.Interaction;
 using FolderPeek.Preview;
 using FolderPeek.Startup;
 using FolderPeek.Theming;
@@ -22,12 +24,14 @@ public partial class App : System.Windows.Application
 {
     private readonly PeekStateMachine _state = new();
     private readonly IFolderInspector _inspector = new FolderInspector();
+    private readonly IShellLauncher _shellLauncher = new WindowsShellLauncher();
     private JsonSettingsService? _settings;
     private IStartupRegistration? _startup;
     private ThemeManager? _theme;
     private ExplorerSnapshotMonitor? _monitor;
     private KeyboardHook? _hook;
     private PreviewWindow? _preview;
+    private ItemActivationService? _activation;
     private Settings.SettingsWindow? _settingsWindow;
     private Forms.NotifyIcon? _tray;
     private Forms.ContextMenuStrip? _trayMenu;
@@ -42,6 +46,9 @@ public partial class App : System.Windows.Application
     private FolderPeekSettings? _gestureSettings;
     private Mutex? _singleInstance;
     private volatile bool _enabled = true;
+    private int _stickyInputActive;
+    private bool _activationInProgress;
+    private bool _detachedSticky;
     private long _previewGeneration;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -61,7 +68,10 @@ public partial class App : System.Windows.Application
         _startup.Changed += OnStartupRegistrationChanged;
         _theme = new ThemeManager(_settings.Current.Theme);
         _theme.Changed += OnThemeChanged;
-        _preview = new PreviewWindow();
+        _preview = new PreviewWindow(_shellLauncher);
+        _preview.OpenRequested += OpenSelectedAsync;
+        _preview.CloseRequested += CloseStickyPreview;
+        _activation = new ItemActivationService(_shellLauncher, new WpfOpenManyConfirmation(_preview, _theme));
         ApplyTheme();
 
         _monitor = new ExplorerSnapshotMonitor();
@@ -88,16 +98,21 @@ public partial class App : System.Windows.Application
         if (!string.IsNullOrWhiteSpace(settingsCapture))
         {
             var captureBottom = e.Args.Contains("--capture-bottom", StringComparer.OrdinalIgnoreCase);
+            var captureInteraction = e.Args.Contains("--capture-interaction", StringComparer.OrdinalIgnoreCase);
             var exitAfterCapture = e.Args.Contains("--exit-after-capture", StringComparer.OrdinalIgnoreCase);
             OpenSettings();
             var captureTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            captureTimer.Tick += (_, _) => { captureTimer.Stop(); _settingsWindow?.CaptureTo(settingsCapture, captureBottom); if (exitAfterCapture) Shutdown(); };
+            captureTimer.Tick += (_, _) => { captureTimer.Stop(); _settingsWindow?.CaptureTo(settingsCapture, captureBottom, captureInteraction); if (exitAfterCapture) Shutdown(); };
             captureTimer.Start();
         }
         var previewCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-preview=", StringComparison.OrdinalIgnoreCase))?["--capture-preview=".Length..];
         var previewFolder = e.Args.FirstOrDefault(argument => argument.StartsWith("--preview-folder=", StringComparison.OrdinalIgnoreCase))?["--preview-folder=".Length..];
+        var captureInteractive = e.Args.Contains("--capture-interactive", StringComparer.OrdinalIgnoreCase);
+        var captureSelection = !e.Args.Contains("--no-capture-selection", StringComparer.OrdinalIgnoreCase);
+        var captureDelayText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-delay-ms=", StringComparison.OrdinalIgnoreCase))?["--capture-delay-ms=".Length..];
+        var captureDelay = int.TryParse(captureDelayText, out var requestedDelay) ? Math.Clamp(requestedDelay, 250, 5000) : 900;
         if (!string.IsNullOrWhiteSpace(previewCapture) && !string.IsNullOrWhiteSpace(previewFolder) && Directory.Exists(previewFolder))
-            _ = CapturePreviewAsync(previewFolder, previewCapture);
+            _ = CapturePreviewAsync(previewFolder, previewCapture, captureInteractive, captureSelection, captureDelay);
         var trayCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-tray=", StringComparison.OrdinalIgnoreCase))?["--capture-tray=".Length..];
         if (!string.IsNullOrWhiteSpace(trayCapture))
         {
@@ -114,7 +129,10 @@ public partial class App : System.Windows.Application
         var ctrl = IsDown(NativeMethods.VkControl);
         var forbidden = IsDown(NativeMethods.VkShift) || IsDown(NativeMethods.VkMenu) || IsDown(NativeMethods.VkLWin) || IsDown(NativeMethods.VkRWin);
         var hotkeyMatches = !forbidden && (settings.Hotkey == TriggerHotkey.ControlSpace ? ctrl : !ctrl);
-        return hotkeyMatches && IsEligible(settings.SnapshotMaxAge);
+        if (!hotkeyMatches || !_enabled) return false;
+        if (Volatile.Read(ref _stickyInputActive) == 1 && _preview is { Handle: not 0 } preview &&
+            NativeMethods.GetForegroundWindow() == preview.Handle) return true;
+        return IsEligible(settings.SnapshotMaxAge);
     }
 
     private bool IsSameEligibleExplorerContext() => IsEligible(_settings!.Current.SnapshotMaxAge);
@@ -135,15 +153,20 @@ public partial class App : System.Windows.Application
         switch (gesture)
         {
             case HookGesture.SpaceDown:
-                _gestureSnapshot = _monitor?.Current;
+                var closingFocusedSticky = _state.State == PeekState.StickyOpen && _preview is { Handle: not 0 } preview &&
+                    NativeMethods.GetForegroundWindow() == preview.Handle;
+                if (!closingFocusedSticky) _gestureSnapshot = _monitor?.Current;
                 _gestureSettings = _settings!.Current;
-                var down = _state.SpaceDown(_gestureSnapshot?.IsEligible == true, _gestureSettings.TapBehavior);
+                var down = _state.SpaceDown(closingFocusedSticky || _gestureSnapshot?.IsEligible == true, _gestureSettings.TapBehavior);
                 if (down.State == PeekState.Pending && _holdTimer is not null)
                 {
                     _holdTimer.Interval = _gestureSettings.HoldThreshold;
                     _holdTimer.Start();
                 }
                 Apply(down);
+                var explorerWindow = _gestureSnapshot?.ForegroundWindow ?? 0;
+                if (closingFocusedSticky && down.Action == PeekAction.Close && explorerWindow != 0)
+                    NativeMethods.SetForegroundWindow(explorerWindow);
                 break;
             case HookGesture.SpaceUp:
                 _holdTimer?.Stop(); Apply(_state.SpaceUp()); break;
@@ -156,19 +179,22 @@ public partial class App : System.Windows.Application
 
     private void Apply(StateTransition transition)
     {
+        Volatile.Write(ref _stickyInputActive, transition.State == PeekState.StickyOpen ? 1 : 0);
         if (_hook is not null) _hook.CanConsumeEscape = transition.State == PeekState.StickyOpen;
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"state={transition.State} action={transition.Action}");
         switch (transition.Action)
         {
             case PeekAction.OpenSticky:
+                if (_gestureSnapshot is { IsEligible: true } stickySnapshot) _ = OpenPreviewAsync(stickySnapshot, _gestureSettings ?? _settings!.Current, true);
+                break;
             case PeekAction.OpenMomentary:
-                if (_gestureSnapshot is { IsEligible: true } snapshot) _ = OpenPreviewAsync(snapshot, _gestureSettings ?? _settings!.Current);
+                if (_gestureSnapshot is { IsEligible: true } snapshot) _ = OpenPreviewAsync(snapshot, _gestureSettings ?? _settings!.Current, false);
                 break;
             case PeekAction.Close: ClosePreview(); break;
         }
     }
 
-    private async Task OpenPreviewAsync(ExplorerSnapshot snapshot, FolderPeekSettings settings)
+    private async Task OpenPreviewAsync(ExplorerSnapshot snapshot, FolderPeekSettings settings, bool sticky)
     {
         if (_preview is null || snapshot.FolderPath is null) return;
         var generation = Interlocked.Increment(ref _previewGeneration);
@@ -177,8 +203,8 @@ public partial class App : System.Windows.Application
         var vm = _preview.ViewModel;
         vm.FolderName = snapshot.DisplayName ?? Path.GetFileName(snapshot.FolderPath);
         vm.FolderPath = snapshot.FolderPath; vm.ShowPath = settings.ShowFullPath;
-        vm.Entries.Clear(); vm.EntriesChanged(); vm.Loading = true; vm.Status = "Loading folder…";
-        _preview.ApplyTheme(_theme!); _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings);
+        _preview.ResetSelection(); vm.Entries.Clear(); vm.EntriesChanged(); vm.Loading = true; vm.Status = "Loading folder…";
+        _preview.ApplyTheme(_theme!); _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, sticky);
 
         FolderContents contents;
         try
@@ -196,16 +222,28 @@ public partial class App : System.Windows.Application
         vm.Status = contents.Error ?? (contents.HasMore
             ? $"{settings.InitialItemLimit}+ items · showing first {settings.InitialItemLimit}"
             : $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}");
-        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings);
+        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, sticky);
         _ = LoadIconsAsync(contents, settings, generation, token);
     }
 
-    private async Task CapturePreviewAsync(string folder, string output)
+    private async Task CapturePreviewAsync(string folder, string output, bool interactive, bool captureSelection, int captureDelayMs)
     {
         var snapshot = new ExplorerSnapshot(true, "Capture", NativeMethods.GetForegroundWindow(), 0, 0, folder,
             Path.GetFileName(folder), CursorAnchor(), DateTimeOffset.UtcNow, 1);
-        await OpenPreviewAsync(snapshot, _settings!.Current);
-        await Task.Delay(900);
+        var captureSettings = interactive
+            ? _settings!.Current with { InteractiveItems = true, MultiSelection = true, ShowSelectionCheckboxes = true }
+            : _settings!.Current;
+        if (interactive)
+        {
+            _gestureSnapshot = snapshot;
+            _gestureSettings = captureSettings;
+            _state.SpaceDown(true, captureSettings.TapBehavior);
+            _state.SpaceUp();
+            Volatile.Write(ref _stickyInputActive, 1);
+        }
+        await OpenPreviewAsync(snapshot, captureSettings, interactive);
+        await Task.Delay(captureDelayMs);
+        if (interactive && captureSelection) _preview?.SelectFirstForCapture(3);
         _preview?.CaptureTo(output);
         Shutdown();
     }
@@ -221,7 +259,7 @@ public partial class App : System.Windows.Application
                 var entry = contents.Entries[index];
                 var icon = await Task.Run(() => ShellIconProvider.GetSmallIcon(entry.FullPath), token);
                 if (token.IsCancellationRequested || generation != Volatile.Read(ref _previewGeneration) || !_preview.IsVisible) return;
-                _preview.ViewModel.Entries[index] = CreateEntry(entry, settings, icon);
+                _preview.ReplaceEntry(index, CreateEntry(entry, settings, icon));
             }
         }
         catch (OperationCanceledException) { }
@@ -229,7 +267,7 @@ public partial class App : System.Windows.Application
     }
 
     private static PreviewEntryViewModel CreateEntry(FolderEntry entry, FolderPeekSettings settings, System.Windows.Media.Imaging.BitmapSource? icon) =>
-        new(entry.Name, entry.IsDirectory ? string.Empty : FormatSize(entry.Size), entry.ModifiedAt.LocalDateTime.ToString("g"),
+        new(entry, entry.IsDirectory ? string.Empty : FormatSize(entry.Size), entry.ModifiedAt.LocalDateTime.ToString("g"),
             settings.ShowFileSize, settings.ShowModifiedDate, icon);
 
     private static string FormatSize(long? value)
@@ -246,18 +284,59 @@ public partial class App : System.Windows.Application
     private void ValidateOpenContext()
     {
         if (_state.State == PeekState.Idle || _gestureSnapshot is null) return;
+        if (_state.State == PeekState.StickyOpen && (_preview?.OwnsForeground == true || _activationInProgress || _detachedSticky)) return;
         var current = _monitor?.Current;
         if (current?.IsEligible == true && current.ForegroundWindow == _gestureSnapshot.ForegroundWindow &&
             string.Equals(current.FolderPath, _gestureSnapshot.FolderPath, StringComparison.OrdinalIgnoreCase)) return;
         _holdTimer?.Stop(); Apply(_state.ContextInvalidated());
     }
 
-    private void ClosePreview() { Interlocked.Increment(ref _previewGeneration); _previewLoad?.Cancel(); _preview?.Hide(); }
+    private void ClosePreview()
+    {
+        Interlocked.Increment(ref _previewGeneration);
+        _previewLoad?.Cancel();
+        _detachedSticky = false;
+        _preview?.Hide();
+        _preview?.SetDetached(false);
+    }
+
+    private void CloseStickyPreview()
+    {
+        var explorerWindow = _gestureSnapshot?.ForegroundWindow ?? 0;
+        Apply(_state.Reset());
+        if (explorerWindow != 0) NativeMethods.SetForegroundWindow(explorerWindow);
+    }
+
+    private async Task OpenSelectedAsync(IReadOnlyList<FolderEntry> entries)
+    {
+        if (_activation is null || _settings is null || _preview is null) return;
+        var settings = _settings.Current;
+        var options = new ActivationOptions(settings.InteractiveItems, settings.AllowOpeningMultipleItems, settings.ConfirmBeforeOpeningMoreThan);
+        _activationInProgress = true;
+        try
+        {
+            var result = await _activation.OpenAsync(entries, options);
+            if (result.Error is not null) { _preview.ViewModel.Status = result.Error; return; }
+            if (result.RequestedCount > 0)
+            {
+                if (settings.ClosePreviewAfterOpening) Apply(_state.Reset());
+                else { _detachedSticky = true; _preview.SetDetached(true); }
+            }
+        }
+        catch (Exception exception)
+        {
+            _preview.ViewModel.Status = exception is FileNotFoundException or DirectoryNotFoundException
+                ? "This item is no longer available."
+                : "Windows could not open the selected item.";
+        }
+        finally { _activationInProgress = false; }
+    }
 
     private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
     {
         _theme?.SetPreference(e.Current.Theme); ApplyTheme();
         if (e.Current.TapBehavior == TapBehavior.MomentaryOnly && _state.State == PeekState.StickyOpen) Apply(_state.Reset());
+        if (_preview?.IsVisible == true) _preview.ConfigureInteraction(_state.State == PeekState.StickyOpen, e.Current);
     }
 
     private void OnThemeChanged(object? sender, EventArgs e) => ApplyTheme();
@@ -376,6 +455,7 @@ public partial class App : System.Windows.Application
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
         _trayMenu?.Dispose();
         _trayMenuFont?.Dispose(); _trayTitleFont?.Dispose();
+        if (_preview is not null) { _preview.OpenRequested -= OpenSelectedAsync; _preview.CloseRequested -= CloseStickyPreview; }
         _settingsWindow?.Close(); _preview?.Close(); _previewLoad?.Dispose(); _singleInstance?.Dispose();
         base.OnExit(e);
     }

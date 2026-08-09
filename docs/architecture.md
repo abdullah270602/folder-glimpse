@@ -16,8 +16,13 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
   from a fresh eligible snapshot whose HWND still equals `GetForegroundWindow()`.
 - `FolderInspection` enumerates only immediate children, asynchronously, with
   cancellation and a bounded initial result set. Directories sort before files.
-- `Preview` is one reusable, non-activating WPF window. Placement is computed in physical
-  pixels against the selected monitor work area and applied with `SetWindowPos`.
+- `Preview` is one reusable WPF tool window. Momentary mode remains non-activating and
+  read-only; sticky mode explicitly takes focus for standard mouse and keyboard interaction.
+  Placement is computed in physical pixels against the selected monitor work area and
+  applied with `SetWindowPos`.
+- `Interaction` owns a UI-independent selection model plus Shell-launch and confirmation
+  abstractions. Paths are passed as data to normal Shell execution; no command strings are
+  constructed and tests use fakes rather than launching applications.
 - `Settings` is an immutable snapshot published by a central JSON service. Writes use a
   same-directory temporary file and atomic replacement; invalid, missing, or partial files
   recover to normalized defaults. Startup registration remains a separate Windows source
@@ -46,9 +51,10 @@ Eligibility requires all of the following:
 6. Shell and UIA agree there is exactly one selected normal filesystem directory.
 
 Any missing evidence, exception, race, unsupported namespace, stale snapshot, or
-integrity boundary causes the key to pass through. Sticky preview closes when its
-Explorer context becomes invalid. Escape is consumed only while a same-context sticky
-preview is visible; otherwise Explorer receives it.
+integrity boundary causes the key to pass through. A sticky preview may own foreground
+focus while it is interactive; it closes when focus moves anywhere other than its own
+context menu. Escape and the configured second Space gesture are handled locally by the
+focused sticky window without broadening the global hook. Otherwise Explorer receives them.
 
 The state machine is `Idle`, `Pending`, `MomentaryOpen`, `StickyOpen`, plus
 `ClosingUntilSpaceUp` so a second sticky-mode Space never leaks an orphan release.
@@ -81,8 +87,12 @@ passes Space.
 
 WPF was chosen over WinUI 3. FolderPeek's difficult work is HWND/COM/UIA interop, for
 which WinUI provides no simplification, while Windows App SDK would add deployment and
-bootstrap complexity. The popup uses `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`,
-`ShowActivated=false`, and `SetWindowPos(... SWP_NOACTIVATE)`. It never takes focus.
+bootstrap complexity. The popup always uses `WS_EX_TOOLWINDOW`. Momentary/read-only mode
+additionally uses `WS_EX_NOACTIVATE`, `ShowActivated=false`, and
+`SetWindowPos(... SWP_NOACTIVATE)`. Sticky interactive mode removes the no-activate style,
+takes foreground focus, and restores the captured Explorer frame when the user dismisses it.
+Because Windows may reject an immediate cross-thread foreground request, the handoff briefly
+attaches only the WPF and current foreground input queues, sets focus, and detaches in `finally`.
 
 `AllowsTransparency` is avoided so DWM can provide reliable shadowing and rounded
 corners. Placement converts the WPF desired DIP size once using the target DPI, then
@@ -126,8 +136,9 @@ and rounded-corner attributes when the menu opens. High-contrast mode maps to sy
 - A conservative cache may miss a very fast press after a selection change; it passes the
   key instead of risking text-input interference.
 - UIA rectangles may be stale, off-screen, or full-row width. Cursor fallback is used.
-- A non-activating preview is view-only. Keyboard navigation is deferred to a future
-  explicit interactive mode.
+- Open-file-location currently opens the containing folder without selecting the child.
+- Full native Explorer shell-extension context menus and internal folder navigation remain
+  deliberately out of scope; FolderPeek exposes only its small non-destructive action set.
 - The hosted development environment's Shell automation probe returned Access Denied, so
   Explorer selection/tab behavior requires the manual checklist in `docs/manual-testing.md`.
 

@@ -8,7 +8,7 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Check | Result |
 |---|---|
 | Debug solution build | Pass, 0 warnings / 0 errors |
-| Automated test executable | Pass, 6/6 suites |
+| Automated test executable | Pass, 9/9 suites |
 | App process startup smoke test | Pass |
 | Windows 11 Explorer selection/focus snapshot | Pass against `UIItem` → `UIItemsView` → `CabinetWClass` ancestry |
 | Sticky tap / second-tap close | Pass in live Explorer |
@@ -21,8 +21,15 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Hidden, modified-date, global-limit sorting | Pass (automated) |
 | Modern Settings render in explicit Light and Dark | Pass (deterministic render inspection) |
 | Shared Settings/Preview scrollbar render | Pass (deterministic render inspection) |
-| Combo/toggle/slider/button accessibility patterns | Pass (6/6 combos, 6/6 toggles, 3/3 sliders, both actions) |
+| Combo/toggle/slider/button accessibility patterns | Pass (6/6 combos, 14/14 toggles, 4/4 sliders, both footer actions) |
 | Tray menu Light/Dark, checkmark, separator, and hover renders | Pass (deterministic render inspection) |
+| Interactive preview selection/checkmark/action-bar render | Pass in explicit Light and Dark (deterministic render inspection) |
+| Interaction Settings section render | Pass in explicit Dark (deterministic render inspection) |
+| Sticky native focus/style probe | Pass; foreground moved to popup, `TOOLWINDOW` present, `NOACTIVATE` absent |
+| Momentary native focus/style probe | Pass; foreground unchanged, `TOOLWINDOW | NOACTIVATE` present |
+| Sticky Ctrl+A keyboard input | Pass; all four displayed fixture rows selected through focused-window input |
+| Sticky Down-arrow keyboard input | Pass; second displayed row became the sole focused selection |
+| Sticky Escape / second-Space close | Pass; popup hid and prior foreground HWND was restored in both probes |
 
 The desktop-control service could not enumerate Windows (`EnumWindows` returned
 `0x80070003`), so validation used direct Windows UI Automation, Shell automation, and an
@@ -47,6 +54,19 @@ folders and opens nothing automatically.
 - [ ] Launch the self-contained `FolderPeek.exe`; verify one tray icon and no taskbar entry.
 - [ ] Open `%TEMP%\FolderPeekTest` in normal, non-elevated File Explorer.
 - [ ] Select `Small`, tap Space, and verify a sticky popup appears beside the selected row.
+- [ ] Single-click a file; verify it highlights without opening. Double-click it and verify
+      its configured Windows application opens.
+- [ ] Double-click a child folder; verify File Explorer opens it without changing FolderPeek
+      into an internal navigation view.
+- [ ] Use Up/Down, Enter, Escape, Ctrl+A, Ctrl-click, and Shift-click in sticky mode; verify
+      standard selection and activation behavior.
+- [ ] Right-click a file, folder, and multi-selection; verify only the documented safe actions.
+- [ ] Copy one path and several paths; verify full paths and newline separation on Clipboard.
+- [ ] Enable selection checkboxes; verify checkbox state and row selection remain identical.
+- [ ] Select above the configured threshold; verify Cancel/Open All appears before any item
+      launches. Disable multi-open and verify no group is launched.
+- [ ] Turn off close-after-opening and verify a successful launch leaves the sticky preview open.
+- [ ] Disable Interactive items; verify sticky preview is read-only and held/momentary behavior is unchanged.
 - [ ] Verify releasing Space does not close sticky mode.
 - [ ] Tap Space again; verify the popup closes and no subsequent key-up affects Explorer.
 - [ ] Select `Small`, hold Space; verify the popup opens at roughly 200 ms and closes on release.

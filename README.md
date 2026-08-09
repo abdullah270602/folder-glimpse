@@ -11,12 +11,16 @@ of the selected File Explorer folder without navigating into it.
 2. In Windows 11 File Explorer, select exactly one normal local folder in the file list.
 3. Tap **Space** to open a sticky preview. Tap **Space** again or press **Escape** to close.
 4. Hold **Space** for about 200 ms to open a momentary preview; release it to close.
-5. Right-click the tray icon for **Settings…**, startup control, temporary disable, About, or Exit.
+5. In a sticky preview, click to select, double-click to open, use Ctrl/Shift for multiple
+   selection, or right-click for safe Open, Copy path, location, and Properties actions.
+6. Right-click the tray icon for **Settings…**, startup control, temporary disable, About, or Exit.
 
 Settings are saved automatically in `%LOCALAPPDATA%\FolderPeek\settings.json`. You can
 choose light/dark/system theme, popup dimensions and density, visible metadata, hidden
 files, sorting, initial item limit, Space or Ctrl+Space, hold delay, tap behavior, and
-launch-at-sign-in. **Reset defaults** restores the original behavior.
+launch-at-sign-in. Interaction settings control activation, multi-selection, optional
+selection checkboxes, open-many confirmation, and whether the popup closes after opening.
+**Reset defaults** restores the original behavior.
 
 FolderPeek deliberately passes Space through when Explorer is not foreground, selection
 is ambiguous, a file or multiple items are selected, a text/search/rename field is
@@ -48,7 +52,8 @@ dotnet publish src/FolderPeek/FolderPeek.csproj -c Release -r win-x64 --self-con
 
 ## Design
 
-- .NET 8/WPF window with no activation, taskbar entry, or Explorer injection
+- .NET 8/WPF tool window with no Explorer injection; momentary mode never activates,
+  while sticky interaction explicitly takes focus and returns it when dismissed
 - conservative Shell automation + UI Automation Explorer snapshot worker
 - dedicated `WH_KEYBOARD_LL` thread; no filesystem, COM, UIA, WPF, or blocking work in
   the hook callback
@@ -76,7 +81,11 @@ See [the architecture decision](docs/architecture.md) and
 - Windows 11 tab disambiguation uses the focused UIA item name plus the matched Explorer
   frame. Two tabs under the same frame selecting same-named folders are treated as
   ambiguous and are rejected.
-- The popup is view-only in V1. Keyboard navigation and opening child items are deferred.
+- Momentary previews remain deliberately view-only. Sticky previews support selection and
+  activation, but do not navigate inside folders.
+- **Open file location** opens the containing directory but does not yet preselect the file.
+- The Properties action requests Windows' normal `properties` Shell verb; unavailable or
+  unassociated handlers fail with a safe in-popup message.
 - Click-away is detected through foreground/focus/selection polling; clicking the same
   already-selected row may leave a sticky preview open. Space or Escape always closes it.
 - High contrast is not specially styled yet. The app follows light/dark app mode.
@@ -93,4 +102,6 @@ launches continue rejecting injected keyboard events.
 
 Visual QA can render deterministic Settings and preview snapshots with
 `--capture-settings=<png>`, `--capture-preview=<png> --preview-folder=<path>`, optional
-`--capture-tray=<png>`, `--capture-theme=Light|Dark`, and `--capture-bottom`.
+`--capture-tray=<png>`, `--capture-theme=Light|Dark`, `--capture-bottom`,
+`--capture-interaction`, and
+`--capture-interactive` for a deterministic selected-row preview.

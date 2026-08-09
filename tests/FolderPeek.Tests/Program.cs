@@ -1,6 +1,7 @@
 using FolderPeek.Core;
 using FolderPeek.Core.FolderInspection;
 using FolderPeek.Core.Input;
+using FolderPeek.Core.Interaction;
 using FolderPeek.Core.Settings;
 
 var tests = new (string Name, Func<Task> Run)[]
@@ -10,6 +11,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Explorer focus ancestry policy", TestExplorerFocusPolicy),
     ("Folder enumeration", TestEnumeration),
     ("Settings persistence and recovery", TestSettings),
+    ("Interactive selection model", TestSelection),
+    ("Safe item activation", TestActivation),
+    ("Context action policy", TestContextActions),
     ("Popup positioning", TestPositioning)
 };
 
@@ -176,10 +180,28 @@ static Task TestSettings()
         service.Load();
         True(File.Exists(path), "missing settings file is created");
         Equal(430d, service.Current.PopupWidth, "defaults loaded");
-        True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100 }, out _), "settings update persists");
+        True(service.Current.InteractiveItems, "interaction defaults on");
+        True(service.Current.DoubleClickFilesToOpen && service.Current.DoubleClickFoldersToOpen, "double-click defaults on");
+        True(service.Current.RightClickActions && service.Current.MultiSelection, "selection actions default on");
+        False(service.Current.ShowSelectionCheckboxes, "selection checkboxes default off");
+        True(service.Current.AllowOpeningMultipleItems && service.Current.ClosePreviewAfterOpening, "safe opening defaults on");
+        Equal(5, service.Current.ConfirmBeforeOpeningMoreThan, "confirmation default is five");
+        True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100,
+            InteractiveItems = false, DoubleClickFilesToOpen = false, DoubleClickFoldersToOpen = false,
+            RightClickActions = false, MultiSelection = false, ShowSelectionCheckboxes = true,
+            AllowOpeningMultipleItems = false, ConfirmBeforeOpeningMoreThan = 12, ClosePreviewAfterOpening = false }, out _), "settings update persists");
         var reloaded = new JsonSettingsService(path); reloaded.Load();
         Equal(ThemePreference.Dark, reloaded.Current.Theme, "enum round trips");
         Equal(612d, reloaded.Current.PopupWidth, "number round trips");
+        True(reloaded.Current.ShowSelectionCheckboxes, "interaction boolean round trips");
+        False(reloaded.Current.AllowOpeningMultipleItems, "multi-open setting round trips");
+        Equal(12, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold round trips");
+        False(reloaded.Current.InteractiveItems, "interactive-items setting round trips");
+        False(reloaded.Current.DoubleClickFilesToOpen, "file activation setting round trips");
+        False(reloaded.Current.DoubleClickFoldersToOpen, "folder activation setting round trips");
+        False(reloaded.Current.RightClickActions, "right-click setting round trips");
+        False(reloaded.Current.MultiSelection, "multi-selection setting round trips");
+        False(reloaded.Current.ClosePreviewAfterOpening, "close-after-open setting round trips");
 
         File.WriteAllText(path, "{ \"showFileSize\": false, \"unknownFutureField\": 123 }");
         reloaded.Load();
@@ -189,12 +211,116 @@ static Task TestSettings()
         File.WriteAllText(path, "{ not-json");
         reloaded.Load();
         Equal(FolderPeekSettings.Default, reloaded.Current, "malformed settings recover to defaults");
-        True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17 }, out _), "invalid values normalize");
+        True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17, ConfirmBeforeOpeningMoreThan = 500 }, out _), "invalid values normalize");
         Equal(700d, reloaded.Current.PopupWidth, "width clamps high");
         Equal(100, reloaded.Current.HoldThresholdMs, "hold delay clamps low");
         Equal(50, reloaded.Current.InitialItemLimit, "unsupported item limit resets");
+        Equal(50, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps high");
+        True(reloaded.TryUpdate(s => s with { ConfirmBeforeOpeningMoreThan = 1 }, out _), "low confirmation threshold normalizes");
+        Equal(2, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps low");
     }
     finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    return Task.CompletedTask;
+}
+
+static Task TestSelection()
+{
+    var model = new SelectionModel();
+    model.Select(0, 5);
+    Sequence([0], model.SelectedIndices, "single click A");
+    model.Select(1, 5);
+    Sequence([1], model.SelectedIndices, "single click B replaces A");
+    model.Select(0, 5, control: true);
+    model.Select(1, 5, control: true);
+    Sequence([0], model.SelectedIndices, "Ctrl-click toggles B off while retaining A");
+    model.Select(1, 5, control: true);
+    Sequence([0, 1], model.SelectedIndices, "Ctrl-click adds B");
+    model.Select(0, 5, control: true);
+    Sequence([1], model.SelectedIndices, "Ctrl-click A again removes it");
+
+    model.Select(0, 5);
+    model.Select(3, 5, shift: true);
+    Sequence([0, 1, 2, 3], model.SelectedIndices, "Shift selects contiguous anchor range");
+    model.SelectAll(5, true);
+    Sequence([0, 1, 2, 3, 4], model.SelectedIndices, "Ctrl+A selects all displayed items");
+    model.Toggle(2, 5, true);
+    Sequence([0, 1, 3, 4], model.SelectedIndices, "checkbox uses the same selection model");
+    model.Select(2, 5, control: true, multiSelection: false);
+    Sequence([2], model.SelectedIndices, "multi-selection disabled forces one item");
+    model.Toggle(4, 5, false);
+    Sequence([4], model.SelectedIndices, "checkbox cannot create multiple selection when disabled");
+    Equal(4, model.Move(1, 5), "Down clamps at the last item");
+    Sequence([4], model.SelectedIndices, "keyboard movement remains single selection");
+    return Task.CompletedTask;
+}
+
+static async Task TestActivation()
+{
+    var root = Path.Combine(Path.GetTempPath(), "FolderPeek.Activation.Tests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var fileA = Path.Combine(root, "file A.txt");
+        var fileB = Path.Combine(root, "文档.txt");
+        var folder = Path.Combine(root, "Folder");
+        await File.WriteAllTextAsync(fileA, "a");
+        await File.WriteAllTextAsync(fileB, "b");
+        Directory.CreateDirectory(folder);
+        var entries = new[] { Entry(fileA, false), Entry(fileB, false), Entry(folder, true) };
+        var launcher = new FakeShellLauncher();
+        var confirmation = new FakeConfirmation(true);
+        var service = new ItemActivationService(launcher, confirmation);
+
+        var immediate = await service.OpenAsync(entries, new(true, true, 5));
+        Equal(3, immediate.RequestedCount, "three items open below threshold");
+        False(immediate.ConfirmationRequested, "below threshold does not confirm");
+        Sequence(["file:" + fileA, "file:" + fileB, "folder:" + folder], launcher.Requests, "mixed items use correct shell operations");
+
+        launcher.Requests.Clear();
+        var six = Enumerable.Repeat(entries[1], 6).ToArray();
+        var confirmed = await service.OpenAsync(six, new(true, true, 5));
+        True(confirmed.ConfirmationRequested && !confirmed.Cancelled, "six items over threshold five confirm first");
+        Equal(6, confirmed.RequestedCount, "confirmation Open All requests every item");
+        Equal(6, launcher.Requests.Count, "all launches happen after confirmation");
+
+        launcher.Requests.Clear();
+        var cancelled = await new ItemActivationService(launcher, new FakeConfirmation(false)).OpenAsync(entries, new(true, true, 2));
+        True(cancelled.ConfirmationRequested && cancelled.Cancelled, "over threshold cancellation is reported");
+        Equal(0, launcher.Requests.Count, "confirmation occurs before any launch");
+
+        var blocked = await service.OpenAsync(entries, new(true, false, 5));
+        Equal(0, blocked.RequestedCount, "multi-open disabled launches nothing");
+        True(blocked.Error is not null, "multi-open disabled explains why");
+
+        launcher.Requests.Clear();
+        File.Delete(fileA);
+        launcher.MissingPaths.Add(fileA);
+        var missing = await service.OpenAsync([entries[0]], new());
+        Equal(0, missing.RequestedCount, "missing file is skipped gracefully");
+        Equal(0, launcher.Requests.Count, "missing file never reaches launcher");
+
+        launcher.Requests.Clear();
+        var disabled = await service.OpenAsync([entries[1]], new(false, true, 5));
+        Equal(0, disabled.RequestedCount, "interaction disabled prevents activation");
+        Equal(0, launcher.Requests.Count, "interaction disabled never reaches launcher");
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static Task TestContextActions()
+{
+    var file = new FolderEntry("file.txt", @"C:\Root\file.txt", false, 1, DateTimeOffset.UtcNow);
+    var folder = new FolderEntry("Folder", @"C:\Root\Folder", true, null, DateTimeOffset.UtcNow);
+    Sequence([ItemAction.Open, ItemAction.OpenFileLocation, ItemAction.CopyPath, ItemAction.Properties], ItemActionPolicy.Available([file], true), "file actions");
+    Sequence([ItemAction.Open, ItemAction.CopyPath, ItemAction.Properties], ItemActionPolicy.Available([folder], true), "folder actions");
+    Sequence([ItemAction.Open, ItemAction.CopyPaths], ItemActionPolicy.Available([file, folder], true), "multiple actions");
+    Equal(@"C:\Root\file.txt" + Environment.NewLine + @"C:\Root\Folder", ItemActionPolicy.PathsForClipboard([file, folder]), "copy paths uses newlines");
+    Equal(0, ItemActionPolicy.Available([file], false).Count, "disabled right-click has no actions");
+    True(ItemActionPolicy.CanDoubleClick(file, FolderPeekSettings.Default), "file double-click enabled by default");
+    True(ItemActionPolicy.CanDoubleClick(folder, FolderPeekSettings.Default), "folder double-click enabled by default");
+    False(ItemActionPolicy.CanDoubleClick(file, FolderPeekSettings.Default with { InteractiveItems = false }), "interaction disabled blocks double-click");
+    False(ItemActionPolicy.CanDoubleClick(file, FolderPeekSettings.Default with { DoubleClickFilesToOpen = false }), "file activation setting blocks file");
+    False(ItemActionPolicy.CanDoubleClick(folder, FolderPeekSettings.Default with { DoubleClickFoldersToOpen = false }), "folder activation setting blocks folder");
     return Task.CompletedTask;
 }
 
@@ -223,9 +349,30 @@ static void Equal<T>(T expected, T actual, string message)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"{message}: expected {expected}, got {actual}");
 }
+static void Sequence<T>(IEnumerable<T> expected, IEnumerable<T> actual, string message)
+{
+    if (!expected.SequenceEqual(actual)) throw new InvalidOperationException($"{message}: expected [{string.Join(", ", expected)}], got [{string.Join(", ", actual)}]");
+}
+static FolderEntry Entry(string path, bool directory) => new(Path.GetFileName(path), path, directory, directory ? null : 1, DateTimeOffset.UtcNow);
 static async Task ThrowsAsync<T>(Func<Task> action, string message) where T : Exception
 {
     try { await action(); }
     catch (T) { return; }
     throw new InvalidOperationException($"{message}: expected {typeof(T).Name}");
+}
+
+sealed class FakeShellLauncher : IShellLauncher
+{
+    public List<string> Requests { get; } = [];
+    public HashSet<string> MissingPaths { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Task OpenFileAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new FileNotFoundException(); Requests.Add("file:" + path); return Task.CompletedTask; }
+    public Task OpenFolderAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new DirectoryNotFoundException(); Requests.Add("folder:" + path); return Task.CompletedTask; }
+    public Task OpenFileLocationAsync(string path, CancellationToken cancellationToken = default) { Requests.Add("location:" + path); return Task.CompletedTask; }
+    public Task ShowPropertiesAsync(string path, CancellationToken cancellationToken = default) { Requests.Add("properties:" + path); return Task.CompletedTask; }
+}
+
+sealed class FakeConfirmation(bool result) : IOpenManyConfirmation
+{
+    public int Calls { get; private set; }
+    public Task<bool> ConfirmAsync(int itemCount, CancellationToken cancellationToken = default) { Calls++; return Task.FromResult(result); }
 }

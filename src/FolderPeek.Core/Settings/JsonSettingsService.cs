@@ -83,7 +83,16 @@ public sealed class JsonSettingsService : ISettingsService
             Density = document.Density ?? defaults.Density,
             Hotkey = document.Hotkey ?? defaults.Hotkey,
             HoldThresholdMs = document.HoldThresholdMs ?? defaults.HoldThresholdMs,
-            TapBehavior = document.TapBehavior ?? defaults.TapBehavior
+            TapBehavior = document.TapBehavior ?? defaults.TapBehavior,
+            InteractiveItems = document.InteractiveItems ?? defaults.InteractiveItems,
+            DoubleClickFilesToOpen = document.DoubleClickFilesToOpen ?? defaults.DoubleClickFilesToOpen,
+            DoubleClickFoldersToOpen = document.DoubleClickFoldersToOpen ?? defaults.DoubleClickFoldersToOpen,
+            RightClickActions = document.RightClickActions ?? defaults.RightClickActions,
+            MultiSelection = document.MultiSelection ?? defaults.MultiSelection,
+            ShowSelectionCheckboxes = document.ShowSelectionCheckboxes ?? defaults.ShowSelectionCheckboxes,
+            AllowOpeningMultipleItems = document.AllowOpeningMultipleItems ?? defaults.AllowOpeningMultipleItems,
+            ConfirmBeforeOpeningMoreThan = document.ConfirmBeforeOpeningMoreThan ?? defaults.ConfirmBeforeOpeningMoreThan,
+            ClosePreviewAfterOpening = document.ClosePreviewAfterOpening ?? defaults.ClosePreviewAfterOpening
         };
     }
 
@@ -134,5 +143,14 @@ public sealed class JsonSettingsService : ISettingsService
         public TriggerHotkey? Hotkey { get; set; }
         public int? HoldThresholdMs { get; set; }
         public TapBehavior? TapBehavior { get; set; }
+        public bool? InteractiveItems { get; set; }
+        public bool? DoubleClickFilesToOpen { get; set; }
+        public bool? DoubleClickFoldersToOpen { get; set; }
+        public bool? RightClickActions { get; set; }
+        public bool? MultiSelection { get; set; }
+        public bool? ShowSelectionCheckboxes { get; set; }
+        public bool? AllowOpeningMultipleItems { get; set; }
+        public int? ConfirmBeforeOpeningMoreThan { get; set; }
+        public bool? ClosePreviewAfterOpening { get; set; }
     }
 }

@@ -35,6 +35,15 @@ public sealed record FolderPeekSettings
     public TriggerHotkey Hotkey { get; init; } = TriggerHotkey.Space;
     public int HoldThresholdMs { get; init; } = 200;
     public TapBehavior TapBehavior { get; init; } = TapBehavior.TogglePreview;
+    public bool InteractiveItems { get; init; } = true;
+    public bool DoubleClickFilesToOpen { get; init; } = true;
+    public bool DoubleClickFoldersToOpen { get; init; } = true;
+    public bool RightClickActions { get; init; } = true;
+    public bool MultiSelection { get; init; } = true;
+    public bool ShowSelectionCheckboxes { get; init; }
+    public bool AllowOpeningMultipleItems { get; init; } = true;
+    public int ConfirmBeforeOpeningMoreThan { get; init; } = 5;
+    public bool ClosePreviewAfterOpening { get; init; } = true;
 
     [JsonIgnore] public TimeSpan HoldThreshold => TimeSpan.FromMilliseconds(HoldThresholdMs);
     [JsonIgnore] public TimeSpan SnapshotMaxAge => TimeSpan.FromMilliseconds(350);
@@ -56,7 +65,8 @@ public sealed record FolderPeekSettings
             Density = Enum.IsDefined(Density) ? Density : DisplayDensity.Comfortable,
             Hotkey = Enum.IsDefined(Hotkey) ? Hotkey : TriggerHotkey.Space,
             HoldThresholdMs = Math.Clamp(HoldThresholdMs, 100, 600),
-            TapBehavior = Enum.IsDefined(TapBehavior) ? TapBehavior : TapBehavior.TogglePreview
+            TapBehavior = Enum.IsDefined(TapBehavior) ? TapBehavior : TapBehavior.TogglePreview,
+            ConfirmBeforeOpeningMoreThan = Math.Clamp(ConfirmBeforeOpeningMoreThan, 2, 50)
         };
     }
 }

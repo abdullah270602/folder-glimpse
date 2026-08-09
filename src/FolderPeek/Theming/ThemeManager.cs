@@ -41,6 +41,8 @@ internal sealed class ThemeManager : IDisposable
         target.Resources["ScrollTrackBrush"] = Brush(dark ? MediaColor.FromArgb(18, 255, 255, 255) : MediaColor.FromArgb(12, 0, 0, 0));
         target.Resources["ScrollThumbBrush"] = Brush(dark ? MediaColor.FromArgb(105, 255, 255, 255) : MediaColor.FromArgb(82, 0, 0, 0));
         target.Resources["ScrollThumbHoverBrush"] = Brush(dark ? MediaColor.FromArgb(170, 255, 255, 255) : MediaColor.FromArgb(145, 0, 0, 0));
+        target.Resources["SelectionBrush"] = Brush(dark ? MediaColor.FromArgb(58, 96, 205, 255) : MediaColor.FromArgb(38, 0, 103, 192));
+        target.Resources["SelectionBorderBrush"] = Brush(dark ? MediaColor.FromRgb(96, 205, 255) : MediaColor.FromRgb(0, 103, 192));
     }
 
     internal void ApplyWindowChrome(Window window)

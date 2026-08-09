@@ -36,9 +36,16 @@ public partial class SettingsWindow : Window
 
     internal void RefreshTheme() { _theme.Apply(this); if (IsLoaded) _theme.ApplyWindowChrome(this); }
 
-    internal void CaptureTo(string path, bool scrollToEnd = false)
+    internal void CaptureTo(string path, bool scrollToEnd = false, bool showInteraction = false)
     {
-        if (scrollToEnd) MainScrollViewer.ScrollToEnd(); else MainScrollViewer.ScrollToTop();
+        UpdateLayout();
+        if (showInteraction)
+        {
+            var position = InteractionHeading.TranslatePoint(new System.Windows.Point(0, 0), MainScrollViewer);
+            MainScrollViewer.ScrollToVerticalOffset(MainScrollViewer.VerticalOffset + position.Y - 8);
+        }
+        else if (scrollToEnd) MainScrollViewer.ScrollToEnd();
+        else MainScrollViewer.ScrollToTop();
         UpdateLayout();
         var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
         var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
@@ -63,7 +70,13 @@ public partial class SettingsWindow : Window
         LimitBox.SelectedItem = FindChoice(LimitBox, s.InitialItemLimit);
         DensityBox.SelectedItem = FindChoice(DensityBox, s.Density); HotkeyBox.SelectedItem = FindChoice(HotkeyBox, s.Hotkey); HoldSlider.Value = s.HoldThresholdMs;
         TapBox.SelectedItem = FindChoice(TapBox, s.TapBehavior); StartupCheck.IsChecked = _startup.IsEnabled;
+        InteractiveCheck.IsChecked = s.InteractiveItems; DoubleFileCheck.IsChecked = s.DoubleClickFilesToOpen;
+        DoubleFolderCheck.IsChecked = s.DoubleClickFoldersToOpen; RightClickCheck.IsChecked = s.RightClickActions;
+        MultiCheck.IsChecked = s.MultiSelection; SelectionCheckboxCheck.IsChecked = s.ShowSelectionCheckboxes;
+        AllowMultiOpenCheck.IsChecked = s.AllowOpeningMultipleItems; ConfirmSlider.Value = s.ConfirmBeforeOpeningMoreThan;
+        CloseAfterOpenCheck.IsChecked = s.ClosePreviewAfterOpening;
         UpdateLabels(); ErrorText.Text = _settings.LastError ?? string.Empty;
+        UpdateDependencies();
         _loading = false;
     }
 
@@ -83,9 +96,19 @@ public partial class SettingsWindow : Window
             Density = (DensityBox.SelectedItem as Choice<DisplayDensity>)?.Value ?? s.Density,
             Hotkey = (HotkeyBox.SelectedItem as Choice<TriggerHotkey>)?.Value ?? s.Hotkey,
             HoldThresholdMs = (int)HoldSlider.Value,
-            TapBehavior = (TapBox.SelectedItem as Choice<TapBehavior>)?.Value ?? s.TapBehavior
+            TapBehavior = (TapBox.SelectedItem as Choice<TapBehavior>)?.Value ?? s.TapBehavior,
+            InteractiveItems = InteractiveCheck.IsChecked == true,
+            DoubleClickFilesToOpen = DoubleFileCheck.IsChecked == true,
+            DoubleClickFoldersToOpen = DoubleFolderCheck.IsChecked == true,
+            RightClickActions = RightClickCheck.IsChecked == true,
+            MultiSelection = MultiCheck.IsChecked == true,
+            ShowSelectionCheckboxes = SelectionCheckboxCheck.IsChecked == true,
+            AllowOpeningMultipleItems = AllowMultiOpenCheck.IsChecked == true,
+            ConfirmBeforeOpeningMoreThan = (int)ConfirmSlider.Value,
+            ClosePreviewAfterOpening = CloseAfterOpenCheck.IsChecked == true
         }, out var error);
         ErrorText.Text = error ?? string.Empty;
+        UpdateDependencies();
     }
 
     private void StartupChanged(object sender, RoutedEventArgs e)
@@ -103,6 +126,17 @@ public partial class SettingsWindow : Window
         WidthLabel.Text = $"{(int)WidthSlider.Value} px";
         HeightLabel.Text = $"{(int)HeightSlider.Value} px";
         HoldLabel.Text = $"{(int)HoldSlider.Value} ms";
+        ConfirmLabel.Text = $"{(int)ConfirmSlider.Value} items";
+    }
+
+    private void UpdateDependencies()
+    {
+        var interactive = InteractiveCheck.IsChecked == true;
+        DoubleFileCard.IsEnabled = interactive; DoubleFolderCard.IsEnabled = interactive; RightClickCard.IsEnabled = interactive;
+        MultiCard.IsEnabled = interactive; CloseAfterCard.IsEnabled = interactive;
+        var multi = interactive && MultiCheck.IsChecked == true;
+        CheckboxCard.IsEnabled = multi; AllowMultiCard.IsEnabled = multi;
+        ConfirmCard.IsEnabled = multi && AllowMultiOpenCheck.IsChecked == true;
     }
 
     private void ResetClicked(object sender, RoutedEventArgs e) { _settings.TryResetDefaults(out var error); ErrorText.Text = error ?? string.Empty; LoadValues(); }

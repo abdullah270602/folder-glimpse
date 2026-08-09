@@ -21,6 +21,8 @@ internal static class NativeMethods
     internal const long WsExToolWindow = 0x00000080L;
     internal const long WsExNoActivate = 0x08000000L;
     internal const uint SwpNoActivate = 0x0010;
+    internal const uint SwpNoSize = 0x0001;
+    internal const uint SwpNoMove = 0x0002;
     internal const uint SwpShowWindow = 0x0040;
     internal const uint MonitorDefaultToNearest = 2;
     internal const int DwmwaWindowCornerPreference = 33;
@@ -28,6 +30,7 @@ internal static class NativeMethods
     internal const int DwmwcpRoundSmall = 3;
 
     internal static readonly nint HwndTopmost = new(-1);
+    internal static readonly nint HwndNotTopmost = new(-2);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct KbdLlHookStruct
@@ -108,10 +111,21 @@ internal static class NativeMethods
     internal static extern nint GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetForegroundWindow(nint window);
+
+    [DllImport("user32.dll")]
     internal static extern bool GetCursorPos(out Point point);
 
     [DllImport("user32.dll")]
     internal static extern uint GetWindowThreadProcessId(nint window, out uint processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool AttachThreadInput(uint attach, uint attachTo, [MarshalAs(UnmanagedType.Bool)] bool attachInput);
+
+    [DllImport("user32.dll")]
+    internal static extern nint SetFocus(nint window);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
