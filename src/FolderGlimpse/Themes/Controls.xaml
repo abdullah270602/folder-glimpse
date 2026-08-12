@@ -10,10 +10,13 @@
   <SolidColorBrush x:Key="SubtleTextBrush" Color="#616161" />
   <SolidColorBrush x:Key="DisabledTextBrush" Color="#9A9A9A" />
   <SolidColorBrush x:Key="LineBrush" Color="#18000000" />
-  <SolidColorBrush x:Key="AccentBrush" Color="#0067C0" />
-  <SolidColorBrush x:Key="AccentHoverBrush" Color="#1975C5" />
-  <SolidColorBrush x:Key="AccentPressedBrush" Color="#005A9E" />
+  <SolidColorBrush x:Key="AccentBrush" Color="#026AFB" />
+  <SolidColorBrush x:Key="AccentHoverBrush" Color="#025DDC" />
+  <SolidColorBrush x:Key="AccentPressedBrush" Color="#014EBB" />
   <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="BrandBlueBrush" Color="#026AFB" />
+  <SolidColorBrush x:Key="SelectionBrush" Color="#26026AFB" />
+  <SolidColorBrush x:Key="SelectionBorderBrush" Color="#026AFB" />
   <SolidColorBrush x:Key="ScrollTrackBrush" Color="#10000000" />
   <SolidColorBrush x:Key="ScrollThumbBrush" Color="#66000000" />
   <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#99000000" />

@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   build-test-smoke:
-    name: Build, test, and smoke test
+    # Keep this name aligned with the required protected-branch status check.
+    name: Build
     runs-on: windows-latest
     timeout-minutes: 25
     env:

@@ -63,10 +63,12 @@ internal sealed class ModernTrayMenuRenderer : ToolStripProfessionalRenderer
             TextRenderer.DrawText(e.Graphics, "Glimpse", e.TextFont, textBounds, _palette.BrandBlue, flags);
             return;
         }
-        e.TextColor = ReferenceEquals(e.Item.Tag, TitleItemTag)
-            ? _palette.Text
-            : e.Item.Enabled ? _palette.Text : _palette.DisabledText;
-        base.OnRenderItemText(e);
+        var itemBounds = new Rectangle(12, 0, Math.Max(1, e.Item.Width - 24), e.Item.Height);
+        var itemFlags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine |
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                        TextFormatFlags.EndEllipsis;
+        var itemColor = e.Item.Enabled ? _palette.Text : _palette.DisabledText;
+        TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, itemBounds, itemColor, itemFlags);
     }
 
     private void DrawBrandMark(Graphics graphics, Rectangle bounds)
@@ -190,9 +192,9 @@ internal sealed class ModernTrayMenuRenderer : ToolStripProfessionalRenderer
 
             return dark
                 ? new TrayPalette(Color.FromArgb(32, 32, 32), Color.FromArgb(52, 52, 52), Color.FromArgb(60, 60, 60),
-                    Color.White, Color.FromArgb(190, 190, 190), Color.FromArgb(126, 126, 126), Color.FromArgb(68, 68, 68), Color.FromArgb(96, 205, 255), Color.FromArgb(96, 165, 250))
+                    Color.White, Color.FromArgb(190, 190, 190), Color.FromArgb(126, 126, 126), Color.FromArgb(68, 68, 68), Color.FromArgb(2, 106, 251), Color.FromArgb(2, 106, 251))
                 : new TrayPalette(Color.White, Color.FromArgb(243, 243, 243), Color.FromArgb(232, 232, 232),
-                    Color.FromArgb(26, 26, 26), Color.FromArgb(97, 97, 97), Color.FromArgb(154, 154, 154), Color.FromArgb(218, 218, 218), Color.FromArgb(0, 103, 192), Color.FromArgb(37, 99, 235));
+                    Color.FromArgb(26, 26, 26), Color.FromArgb(97, 97, 97), Color.FromArgb(154, 154, 154), Color.FromArgb(218, 218, 218), Color.FromArgb(2, 106, 251), Color.FromArgb(2, 106, 251));
         }
     }
 }
