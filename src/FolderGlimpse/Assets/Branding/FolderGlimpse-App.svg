@@ -8,10 +8,10 @@
   <rect x="12" y="12" width="232" height="232" rx="52" fill="url(#navy)"/>
   <path d="M48 76a12 12 0 0 1 12-12h50l14 16h67a12 12 0 0 1 12 12v78H48z" fill="url(#rear)"/>
   <path d="M42 106a12 12 0 0 1 12-12h58l14 15h73a12 12 0 0 1 12 12v76a14 14 0 0 1-14 14H56a14 14 0 0 1-14-14z" fill="url(#folder)" filter="url(#shadow)"/>
-  <rect x="128" y="124" width="74" height="88" rx="11" fill="#60A5FA" transform="rotate(-8 165 168)" opacity=".88"/>
+  <rect x="128" y="124" width="74" height="88" rx="11" fill="#026AFB" transform="rotate(-8 165 168)" opacity=".88"/>
   <g transform="rotate(-6 179 164)" filter="url(#shadow)">
     <rect x="139" y="119" width="80" height="94" rx="12" fill="#F8FAFC"/>
-    <rect x="158" y="146" width="43" height="8" rx="4" fill="#2563EB"/>
+    <rect x="158" y="146" width="43" height="8" rx="4" fill="#026AFB"/>
     <rect x="158" y="166" width="34" height="7" rx="3.5" fill="#94A3B8"/>
     <rect x="158" y="184" width="28" height="7" rx="3.5" fill="#CBD5E1"/>
   </g>

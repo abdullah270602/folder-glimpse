@@ -28,5 +28,7 @@
   <ItemGroup>
     <Resource Include="Assets\Branding\FolderGlimpse-App.ico" />
     <Resource Include="Assets\Branding\FolderGlimpse-Tray.ico" />
+    <Resource Include="Assets\Branding\FolderGlimpse-Mark-256.png" />
+    <Resource Include="Assets\Branding\FolderGlimpse-Mark-512.png" />
   </ItemGroup>
 </Project>

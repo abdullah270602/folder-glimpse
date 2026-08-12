@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:branding="clr-namespace:FolderGlimpse.Branding"
         Title="FolderGlimpse" Width="860" Height="640" MinWidth="760" MinHeight="560"
+        Icon="/FolderGlimpse;component/Assets/Branding/FolderGlimpse-App.ico"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBrush}" UseLayoutRounding="True" SnapsToDevicePixels="True">
   <Window.Resources>

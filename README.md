@@ -36,7 +36,8 @@ to view it only while the key is pressed.
 - **Multi-select and context actions** with familiar Windows interactions
 - **System, light, and dark themes** with mixed-DPI monitor support
 - **Compact control center** for settings, help, startup behavior, and app status
-- **Quiet tray operation** with optional launch at sign-in
+- **Consistent Windows 11 styling** with purpose-built application and tray icons
+- **Quiet tray operation** with centered actions, enable/disable, settings, startup, and exit
 - **Local and private**: no account, cloud service, analytics, or telemetry
 
 ## Download and install
@@ -53,6 +54,10 @@ Official release builds will not require a separate .NET installation.
 > FolderGlimpse is not code-signed yet. Windows SmartScreen may show an
 > “unrecognized app” message on first launch. Download only from this repository's
 > official [Releases](https://github.com/abdullah270602/folder-glimpse/releases) page.
+
+For private testing before the first official release, the entire self-contained build folder
+may be zipped and shared. Recipients should extract it before running the EXE and understand that
+the build is unsigned. Do not present a locally shared build as an official GitHub release.
 
 ### Verify a download
 
@@ -106,7 +111,8 @@ In an interactive sticky preview:
 - Right-click for safe actions such as Open, Copy path, Open file location, and Properties.
 
 Closing the control-center window does not exit FolderGlimpse; it continues running in
-the notification area. To stop it completely, choose **Exit** from the tray menu.
+the notification area. The tray menu provides **Open FolderGlimpse**, **Enabled**, **Settings…**,
+**Launch at startup**, and **Exit**. To stop the app completely, choose **Exit**.
 
 ## Safety and privacy
 
@@ -156,6 +162,10 @@ dotnet publish src/FolderGlimpse/FolderGlimpse.csproj `
 ```
 
 The output is `artifacts/FolderGlimpse-win-x64/FolderGlimpse.exe`.
+
+To share a private test build, zip the complete `artifacts/FolderGlimpse-win-x64` folder. With the
+single-file options above, it normally contains only the portable EXE; sharing the whole folder
+keeps the process unambiguous if release files are added later.
 
 ## Contributing
 

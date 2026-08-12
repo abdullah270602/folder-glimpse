@@ -478,9 +478,8 @@ public partial class App : System.Windows.Application
         _startupMenu = TrayItem("Launch at startup");
         _startupMenu.Checked = _startup!.IsEnabled;
         _startupMenu.Click += (_, _) => { _startup.TrySetEnabled(!_startup.IsEnabled, out var error); _startupMenu.Checked = _startup.IsEnabled; if (error is not null) Forms.MessageBox.Show(error, "FolderGlimpse"); };
-        var about = TrayItem("About FolderGlimpse"); about.Click += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.About));
         var exit = TrayItem("Exit"); exit.Click += (_, _) => RequestExit();
-        _trayMenu.Items.AddRange([title, TraySeparator(), open, _enabledMenu, settings, _startupMenu, TraySeparator(), about, exit]);
+        _trayMenu.Items.AddRange([title, TraySeparator(), open, _enabledMenu, settings, _startupMenu, TraySeparator(), exit]);
         ApplyTrayTheme();
         _tray.DoubleClick += (_, _) => Dispatcher.BeginInvoke(() => ShowMain(InitialSurface.Home));
     }
