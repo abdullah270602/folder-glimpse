@@ -256,8 +256,6 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: artifacts/signed-output
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          parameters: |
-            version: "${{ needs.prepare.outputs.version }}"
 
       - name: Normalize and verify Authenticode signature
         shell: pwsh
