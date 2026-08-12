@@ -5,5 +5,7 @@
     <RootNamespace>FolderGlimpse.Core</RootNamespace>
     <Product>FolderGlimpse</Product>
     <Description>Glance inside folders without opening them, and so much more.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright © 2026 Abdullah Naseem</Copyright>
   </PropertyGroup>
 </Project>

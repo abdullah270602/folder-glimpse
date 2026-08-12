@@ -5,3 +5,16 @@
 *.user
 *.log
 artifacts/
+
+# Public release signing material must never enter the repository.
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+*.cer
+*.crt
+*.der
+*.jks
+*.keystore
+signing/

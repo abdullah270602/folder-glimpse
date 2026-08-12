@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460" role="img" aria-labelledby="title description">
+  <title id="title">FolderGlimpse folder preview</title>
+  <desc id="description">A compact preview showing folders and files inside a Projects folder.</desc>
   <rect width="900" height="460" rx="24" fill="#eef1f6"/>
   <rect x="235" y="55" width="430" height="350" rx="12" fill="#fafafa" stroke="#d7d7d7"/>
   <text x="270" y="105" font-family="Segoe UI Emoji, Segoe UI" font-size="25">📁</text>

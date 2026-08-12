@@ -1,0 +1,379 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer used only for an unsigned dry run
+        required: true
+        default: 0.1.0-dryrun.1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Build and test unsigned candidate
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      file-version: ${{ steps.version.outputs.file_version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      REQUESTED_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out repository and tags
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and validate version
+        id: version
+        shell: pwsh
+        run: |
+          $candidate = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { $env:REQUESTED_VERSION }
+          ./scripts/Resolve-ReleaseVersion.ps1 -InputVersion $candidate -GitHubOutput $env:GITHUB_OUTPUT
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ((git cat-file -t $env:GITHUB_REF_NAME) -ne 'tag') {
+              throw 'Production releases require an annotated tag; lightweight tags are rejected.'
+            }
+            if ((git rev-list -n 1 $env:GITHUB_REF_NAME) -ne $env:GITHUB_SHA) {
+              throw 'The release tag does not resolve to the workflow commit.'
+            }
+            git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+            if ($LASTEXITCODE -ne 0) {
+              throw 'The release commit must already be contained in the protected main branch.'
+            }
+          }
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore FolderGlimpse.sln --configfile NuGet.config
+
+      - name: Build Release
+        run: >-
+          dotnet build FolderGlimpse.sln -c Release --no-restore
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:FileVersion=${{ steps.version.outputs.file_version }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Run all tests
+        run: dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release --no-build
+
+      - name: Publish self-contained Windows x64 candidate
+        run: >-
+          dotnet publish src/FolderGlimpse/FolderGlimpse.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:FileVersion=${{ steps.version.outputs.file_version }}
+          -p:ContinuousIntegrationBuild=true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o artifacts/unsigned
+
+      - name: Verify unsigned candidate metadata
+        shell: pwsh
+        run: |
+          $exe = Get-Item -LiteralPath artifacts/unsigned/FolderGlimpse.exe
+          if ($exe.VersionInfo.ProductName -ne 'FolderGlimpse' -or
+              -not $exe.VersionInfo.ProductVersion.StartsWith('${{ steps.version.outputs.version }}') -or
+              $exe.VersionInfo.FileVersion -ne '${{ steps.version.outputs.file_version }}') {
+            throw 'Published executable metadata does not match the release version.'
+          }
+          if ((Get-AuthenticodeSignature -LiteralPath $exe.FullName).Status -ne 'NotSigned') {
+            throw 'The pre-signing candidate unexpectedly contains a signature.'
+          }
+
+      - name: Upload unsigned candidate for trusted signing
+        id: unsigned
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: FolderGlimpse-unsigned-${{ steps.version.outputs.version }}
+          path: artifacts/unsigned/FolderGlimpse.exe
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+  dry-run:
+    name: Package unsigned dry run
+    if: github.event_name == 'workflow_dispatch'
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore release dependency graph for SBOM
+        run: >-
+          dotnet restore src/FolderGlimpse/FolderGlimpse.csproj
+          --configfile NuGet.config -r win-x64
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+
+      - name: Download unsigned candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+          path: artifacts/candidate
+
+      - name: Generate SPDX SBOM for the packaged candidate
+        shell: pwsh
+        run: |
+          $toolDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom-tool'
+          $manifestDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom'
+          New-Item $manifestDirectory -ItemType Directory -Force | Out-Null
+          dotnet tool install Microsoft.Sbom.DotNetTool --version 4.1.5 --tool-path $toolDirectory
+          & (Join-Path $toolDirectory 'sbom-tool.exe') generate `
+            -b artifacts/candidate -bc src -m $manifestDirectory `
+            -pn FolderGlimpse -pv '${{ needs.prepare.outputs.version }}' `
+            -ps 'Abdullah Naseem' -nsb 'https://github.com/abdullah270602/folder-glimpse'
+          $manifest = @(Get-ChildItem $manifestDirectory -Filter manifest.spdx.json -Recurse)
+          if ($manifest.Count -ne 1) { throw "Expected exactly one SPDX manifest, found $($manifest.Count)." }
+          New-Item artifacts/sbom -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $manifest[0].FullName -Destination artifacts/sbom/FolderGlimpse.spdx.json
+
+      - name: Build and validate dry-run bundle
+        shell: pwsh
+        run: >-
+          ./scripts/New-ReleaseBundle.ps1
+          -SourceExecutable artifacts/candidate/FolderGlimpse.exe
+          -SbomPath artifacts/sbom/FolderGlimpse.spdx.json
+          -OutputDirectory artifacts/final
+          -Version '${{ needs.prepare.outputs.version }}'
+
+      - name: Mark bundle as non-production
+        shell: pwsh
+        run: |
+          @'
+          UNSIGNED DRY RUN - NOT FOR DISTRIBUTION
+
+          This artifact validates packaging only. It is not Authenticode-signed,
+          is not an official FolderGlimpse release, and must not be redistributed.
+          '@ | Set-Content artifacts/final/UNSIGNED-DRY-RUN.txt -Encoding utf8
+
+      - name: Upload dry-run bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: FolderGlimpse-unsigned-dry-run-${{ needs.prepare.outputs.version }}
+          path: artifacts/final/*
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-release:
+    name: Sign, verify, attest, and release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 45
+    environment: production-signing
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+      SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+      SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+      SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+      SIGNING_CERTIFICATE_SUBJECT: ${{ vars.SIGNING_CERTIFICATE_SUBJECT }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore release dependency graph for final SBOM
+        run: >-
+          dotnet restore src/FolderGlimpse/FolderGlimpse.csproj
+          --configfile NuGet.config -r win-x64
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+
+      - name: Enforce production prerequisites
+        shell: pwsh
+        run: |
+          ./scripts/Test-ProductionRepository.ps1 `
+            -RepositoryRoot . -Version '${{ needs.prepare.outputs.version }}'
+          $required = @(
+            'SIGNPATH_ORGANIZATION_ID',
+            'SIGNPATH_PROJECT_SLUG',
+            'SIGNPATH_SIGNING_POLICY_SLUG',
+            'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG',
+            'SIGNING_CERTIFICATE_SUBJECT'
+          )
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Production signing configuration '$name' is missing. No unsigned release will be published."
+            }
+          }
+
+      - name: Submit trusted signing request
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ needs.prepare.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/signed-output
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parameters: |
+            version: "${{ needs.prepare.outputs.version }}"
+
+      - name: Normalize and verify Authenticode signature
+        shell: pwsh
+        run: |
+          $matches = @(Get-ChildItem artifacts/signed-output -Filter FolderGlimpse.exe -Recurse)
+          if ($matches.Count -ne 1) { throw "Expected exactly one signed FolderGlimpse.exe, found $($matches.Count)." }
+          New-Item artifacts/signed -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $matches[0].FullName -Destination artifacts/signed/FolderGlimpse.exe
+          $signature = Get-AuthenticodeSignature -LiteralPath artifacts/signed/FolderGlimpse.exe
+          if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or -not $signature.TimeStamperCertificate) {
+            throw 'SignPath output is not validly Authenticode-signed and timestamped.'
+          }
+          if ($signature.SignerCertificate.Subject -cne $env:SIGNING_CERTIFICATE_SUBJECT) {
+            throw "Unexpected signing identity '$($signature.SignerCertificate.Subject)'."
+          }
+          $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          $signTool = Get-ChildItem $sdkRoot -Filter signtool.exe -Recurse |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signTool) { throw 'Windows SDK SignTool was not found.' }
+          $signToolOutput = & $signTool.FullName verify /pa /all /v artifacts/signed/FolderGlimpse.exe 2>&1
+          $signToolOutput | Write-Output
+          if ($LASTEXITCODE -ne 0) { throw 'SignTool rejected the signed executable.' }
+          if (($signToolOutput -join "`n") -notmatch '(?i)Hash of file \(sha256\)') {
+            throw 'The Authenticode signature does not report a SHA-256 file digest.'
+          }
+
+      - name: Microsoft Defender scan
+        shell: pwsh
+        run: |
+          $platform = Join-Path $env:ProgramData 'Microsoft\Windows Defender\Platform'
+          $scanner = Get-ChildItem $platform -Filter MpCmdRun.exe -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if ($scanner) {
+            & $scanner.FullName -Scan -ScanType 3 -File (Resolve-Path artifacts/signed/FolderGlimpse.exe)
+            if ($LASTEXITCODE -ne 0) { throw "Microsoft Defender scan failed with exit code $LASTEXITCODE." }
+          } else {
+            Write-Warning 'Microsoft Defender command-line scanner is unavailable on this runner.'
+          }
+
+      - name: Generate SPDX SBOM for the signed executable
+        shell: pwsh
+        run: |
+          $toolDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom-tool'
+          $manifestDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom'
+          New-Item $manifestDirectory -ItemType Directory -Force | Out-Null
+          dotnet tool install Microsoft.Sbom.DotNetTool --version 4.1.5 --tool-path $toolDirectory
+          & (Join-Path $toolDirectory 'sbom-tool.exe') generate `
+            -b artifacts/signed -bc src -m $manifestDirectory `
+            -pn FolderGlimpse -pv '${{ needs.prepare.outputs.version }}' `
+            -ps 'Abdullah Naseem' -nsb 'https://github.com/abdullah270602/folder-glimpse'
+          $manifest = @(Get-ChildItem $manifestDirectory -Filter manifest.spdx.json -Recurse)
+          if ($manifest.Count -ne 1) { throw "Expected exactly one SPDX manifest, found $($manifest.Count)." }
+          New-Item artifacts/sbom -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $manifest[0].FullName -Destination artifacts/sbom/FolderGlimpse.spdx.json
+
+      - name: Build and validate signed release bundle
+        shell: pwsh
+        run: >-
+          ./scripts/New-ReleaseBundle.ps1
+          -SourceExecutable artifacts/signed/FolderGlimpse.exe
+          -SbomPath artifacts/sbom/FolderGlimpse.spdx.json
+          -OutputDirectory artifacts/final
+          -Version '${{ needs.prepare.outputs.version }}'
+          -RequireSignature
+
+      - name: Extract and launch signed ZIP smoke test
+        shell: pwsh
+        run: |
+          $extract = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-release-smoke'
+          Expand-Archive artifacts/final/FolderGlimpse-win-x64.zip -DestinationPath $extract
+          $capture = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-release-home.png'
+          & (Join-Path $extract 'FolderGlimpse.exe') "--capture-main=$capture" --capture-section=Home --capture-theme=Dark
+          for ($attempt = 0; $attempt -lt 30 -and -not (Test-Path -LiteralPath $capture); $attempt++) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path -LiteralPath $capture) -or (Get-Item -LiteralPath $capture).Length -lt 1000) {
+            throw 'The signed ZIP did not pass its launch smoke test.'
+          }
+
+      - name: Attest release provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            artifacts/final/FolderGlimpse.exe
+            artifacts/final/FolderGlimpse-win-x64.zip
+            artifacts/final/FolderGlimpse.spdx.json
+            artifacts/final/SHA256SUMS.txt
+
+      - name: Attest executable SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: artifacts/final/FolderGlimpse.exe
+          sbom-path: artifacts/final/FolderGlimpse.spdx.json
+
+      - name: Upload immutable release bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: FolderGlimpse-release-${{ needs.prepare.outputs.version }}
+          path: artifacts/final/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $arguments = @(
+            'release', 'create', '${{ needs.prepare.outputs.tag }}',
+            'artifacts/final/FolderGlimpse.exe',
+            'artifacts/final/FolderGlimpse-win-x64.zip',
+            'artifacts/final/FolderGlimpse.spdx.json',
+            'artifacts/final/SHA256SUMS.txt',
+            '--verify-tag', '--generate-notes',
+            '--title', 'FolderGlimpse ${{ needs.prepare.outputs.tag }}'
+          )
+          if ('${{ needs.prepare.outputs.prerelease }}' -eq 'true') { $arguments += '--prerelease' }
+          gh @arguments

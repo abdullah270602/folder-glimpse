@@ -8,7 +8,7 @@ Environment: Windows 11 x64 (`10.0.26200`), .NET SDK 8.0.423
 | Check | Result |
 |---|---|
 | Debug solution build | Pass, 0 warnings / 0 errors |
-| Automated test executable | Pass, 9/9 suites |
+| Automated test executable | Pass, 13/13 suites |
 | App process startup smoke test | Pass |
 | Windows 11 Explorer selection/focus snapshot | Pass against `UIItem` → `UIItemsView` → `CabinetWClass` ancestry |
 | Sticky tap / second-tap close | Pass in live Explorer |
@@ -37,6 +37,9 @@ opt-in diagnostic build that accepts injected input. A real physical Space press
 observed by the hook as non-injected and owned for the eligible folder. Mixed-DPI,
 rename-in-progress, and session-transition cases still require the checklist below before
 broad distribution.
+
+The table records development evidence, not a substitute for the required release gate. Every
+signed production candidate must repeat the automated checks and applicable hands-on cases.
 
 ## Prepare fixtures
 
@@ -104,6 +107,11 @@ folders and opens nothing automatically.
 - [ ] Replace settings.json with empty, partial, malformed, and out-of-range content; verify
       safe recovery without a crash and a healed complete file.
 - [ ] Choose **Exit**; verify the process and hook terminate cleanly.
+- [ ] Download the final GitHub Release assets on a clean Windows 11 account; verify
+      `SHA256SUMS.txt`, `Get-AuthenticodeSignature`, the RFC 3161 timestamp, and Windows SDK
+      `signtool verify /pa /all /v` before launching.
+- [ ] Extract `FolderGlimpse-win-x64.zip`; verify its EXE hash equals the standalone asset and
+      complete first-run, preview, startup, update-replacement, and uninstall checks.
 
 Record Windows build, Explorer version, display layout/scales, and any failed eligibility
 reason from a Debug build when reporting results.

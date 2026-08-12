@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible FolderGlimpse problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please remove private filenames and paths from screenshots or logs.
+  - type: input
+    id: version
+    attributes:
+      label: FolderGlimpse version
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2, OS build ...
+    validations:
+      required: true
+  - type: dropdown
+    id: explorer_view
+    attributes:
+      label: File Explorer view
+      options: [Details, List, Tiles, Small icons, Medium icons, Large icons, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Tell us exactly what you selected and which keys or buttons you used.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: This report does not contain private or security-sensitive information.
+          required: true

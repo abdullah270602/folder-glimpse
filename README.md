@@ -1,130 +1,184 @@
-# FolderGlimpse
+<div align="center">
+  <img src="src/FolderGlimpse/Assets/Branding/FolderGlimpse-App-128.png" width="96" alt="FolderGlimpse icon">
+  <h1>FolderGlimpse</h1>
+  <p><strong>Glance inside folders without opening them.</strong></p>
+  <p>A fast, lightweight folder preview utility built for Windows 11.</p>
 
-**Glance inside folders without opening them, and so much more.**
+  [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)](https://www.microsoft.com/windows/windows-11)
+  [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+  [![Latest release](https://img.shields.io/github/v/release/abdullah270602/folder-glimpse?display_name=tag&sort=semver)](https://github.com/abdullah270602/folder-glimpse/releases/latest)
 
-FolderGlimpse is a lightweight Windows utility that lets you quickly inspect the contents
-of a folder directly from File Explorer without navigating into it.
+  <br>
 
-Select a folder, press Space, and glimpse what's inside.
+  **[Download FolderGlimpse for Windows](https://github.com/abdullah270602/folder-glimpse/releases/latest/download/FolderGlimpse.exe)**
+  · [View releases](https://github.com/abdullah270602/folder-glimpse/releases)
+  · [Report an issue](https://github.com/abdullah270602/folder-glimpse/issues)
+</div>
 
-![FolderGlimpse preview](docs/screenshot-placeholder.svg)
+---
 
-## Launch experience
+> [!IMPORTANT]
+> No official FolderGlimpse binary has been published yet. The download links above will become
+> active after the first reviewed, Authenticode-signed GitHub Release. Until then, build from
+> source for evaluation and do not redistribute local validation artifacts.
 
-- On the first normal launch, FolderGlimpse shows a short one-page introduction and then
-  opens its Home control center.
-- Later normal launches open the control center on Home. A second launch reuses and brings
-  forward the already-running instance instead of creating another tray icon or input hook.
-- Windows startup uses the explicit `--startup` mode and starts quietly in the tray—no
-  Welcome page, main window, or splash.
-- Closing the control-center window keeps FolderGlimpse running. Reopen it from the tray's
-  **Open FolderGlimpse**, **Settings…**, or **About FolderGlimpse** commands.
-- To fully stop FolderGlimpse, choose **Exit** from the tray menu.
+FolderGlimpse lets you inspect a folder directly from File Explorer without navigating
+into it. Select a folder and press <kbd>Space</kbd>: tap to keep the preview open, or hold
+to view it only while the key is pressed.
 
-## Use it
+![FolderGlimpse folder preview](docs/preview.svg)
 
-1. Launch `FolderGlimpse.exe`, complete the brief introduction on first run, then leave the
-   control center open or close it to the notification area.
-2. In Windows 11 File Explorer, select exactly one normal local folder in the file list.
-3. Tap **Space** to open a sticky preview. Tap **Space** again or press **Escape** to close.
-4. Hold **Space** for about 200 ms to open a momentary preview; release it to close.
-5. In a sticky preview, click to select, double-click to open, use Ctrl/Shift for multiple
-   selection, or right-click for safe Open, Copy path, location, and Properties actions.
-6. Right-click the tray icon to open Home, deep-link to Settings or About, control startup,
-   temporarily pause previews, or exit.
+## Highlights
 
-Settings are saved automatically in `%LOCALAPPDATA%\FolderGlimpse\settings.json`. You can
-choose light/dark/system theme, popup dimensions and density, visible metadata, hidden
-files, sorting, initial item limit, Space or Ctrl+Space, hold delay, tap behavior, and
-launch-at-sign-in. Interaction settings control activation, multi-selection, optional
-selection checkboxes, open-many confirmation, and whether the popup closes after opening.
-**Reset defaults** restores the original behavior.
+- **Instant folder previews** from Windows 11 File Explorer
+- **Tap or hold** the configured shortcut for sticky or momentary previews
+- **Open files and folders** directly from an interactive sticky preview
+- **Multi-select and context actions** with familiar Windows interactions
+- **System, light, and dark themes** with mixed-DPI monitor support
+- **Compact control center** for settings, help, startup behavior, and app status
+- **Quiet tray operation** with optional launch at sign-in
+- **Local and private**: no account, cloud service, analytics, or telemetry
 
-FolderGlimpse deliberately passes Space through when Explorer is not foreground, selection
-is ambiguous, a file or multiple items are selected, a text/search/rename field is
-focused, a modifier is held, or its Explorer snapshot is stale. Plain Space does have an
-Explorer selection meaning, so FolderGlimpse only overrides it in the narrow eligible case.
+## Download and install
 
-## Build
+FolderGlimpse will initially be distributed as a portable, self-contained Windows x64 app.
+Official release builds will not require a separate .NET installation.
 
-Requirements: Windows 11 x64 and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
-No third-party NuGet packages are used.
+1. Download **[FolderGlimpse.exe](https://github.com/abdullah270602/folder-glimpse/releases/latest/download/FolderGlimpse.exe)**.
+2. Move it to a permanent folder such as `%LOCALAPPDATA%\Programs\FolderGlimpse`.
+3. Run `FolderGlimpse.exe` and complete the short first-run introduction.
+4. Optionally enable **Launch at startup** in Settings or from the tray menu.
+
+> [!NOTE]
+> FolderGlimpse is not code-signed yet. Windows SmartScreen may show an
+> “unrecognized app” message on first launch. Download only from this repository's
+> official [Releases](https://github.com/abdullah270602/folder-glimpse/releases) page.
+
+### Verify a download
+
+Each production release will include `SHA256SUMS.txt`. From the folder containing the
+download, compare the published hash with the locally calculated value:
 
 ```powershell
-dotnet restore FolderGlimpse.sln
+Get-FileHash .\FolderGlimpse.exe -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+```
+
+Once production signing is enabled, verify both the publisher signature and timestamp:
+
+```powershell
+$signature = Get-AuthenticodeSignature .\FolderGlimpse.exe
+$signature | Format-List Status, StatusMessage
+$signature.SignerCertificate | Format-List Subject, Thumbprint, NotAfter
+$signature.TimeStamperCertificate | Format-List Subject, NotAfter
+```
+
+Only a `Valid` status from an official release is acceptable. Signing proves publisher
+identity and file integrity; it does not guarantee that Microsoft SmartScreen will never
+warn, because reputation is evaluated separately.
+
+### Updating
+
+Download the newest EXE from [Releases](https://github.com/abdullah270602/folder-glimpse/releases)
+and replace the previous file after exiting FolderGlimpse from the tray.
+
+### Uninstalling
+
+1. Right-click the tray icon and choose **Exit**.
+2. Disable **Launch at startup** first if it is enabled.
+3. Delete `FolderGlimpse.exe`.
+4. Optional: delete `%LOCALAPPDATA%\FolderGlimpse` to remove saved preferences.
+
+## How to use
+
+1. Open Windows 11 File Explorer.
+2. Select exactly one normal local folder in the file list.
+3. Tap <kbd>Space</kbd> to keep a preview open, or hold it for a momentary preview.
+4. Tap <kbd>Space</kbd> again or press <kbd>Esc</kbd> to close a sticky preview.
+
+In an interactive sticky preview:
+
+- Click to select an item.
+- Double-click a file to open it in its normal Windows app.
+- Double-click a folder to open it in File Explorer.
+- Use <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for multiple selection.
+- Press <kbd>Enter</kbd> to open selected items.
+- Right-click for safe actions such as Open, Copy path, Open file location, and Properties.
+
+Closing the control-center window does not exit FolderGlimpse; it continues running in
+the notification area. To stop it completely, choose **Exit** from the tray menu.
+
+## Safety and privacy
+
+FolderGlimpse works offline, requires no administrator privileges, performs no telemetry,
+and does not modify previewed folders. It uses conservative Explorer and UI Automation
+checks and passes the shortcut through whenever the current context cannot be proven safe—for
+example, while typing in search, the address bar, or a rename field.
+
+Settings and application state are stored locally under `%LOCALAPPDATA%\FolderGlimpse`.
+
+## Compatibility and current limitations
+
+- Windows 11 x64 is the supported target.
+- V1 previews ordinary local filesystem folders only.
+- Network/UNC folders, ZIPs, Libraries, This PC, Recycle Bin, and other virtual Shell
+  locations are intentionally not supported yet.
+- Elevated Explorer windows may not be accessible to a normally launched FolderGlimpse;
+  the shortcut passes through safely in that case.
+- Momentary previews are view-only. Sticky previews support selection and activation.
+- High contrast does not yet have a dedicated visual theme.
+
+## Build from source
+
+Requirements:
+
+- Windows 11 x64
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Git
+
+```powershell
+git clone https://github.com/abdullah270602/folder-glimpse.git
+cd folder-glimpse
+dotnet restore FolderGlimpse.sln --configfile NuGet.config
 dotnet build FolderGlimpse.sln -c Release
 dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release
 ```
 
-Create a framework-dependent build:
+Create the same self-contained single-file build used for releases:
 
 ```powershell
-dotnet publish src/FolderGlimpse/FolderGlimpse.csproj -c Release -r win-x64 --self-contained false -o artifacts/FolderGlimpse-win-x64
+dotnet publish src/FolderGlimpse/FolderGlimpse.csproj `
+  -c Release -r win-x64 --self-contained true `
+  -p:PublishSingleFile=true `
+  -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true `
+  -o artifacts/FolderGlimpse-win-x64
 ```
 
-Create the preferred self-contained single-file build:
+The output is `artifacts/FolderGlimpse-win-x64/FolderGlimpse.exe`.
 
-```powershell
-dotnet publish src/FolderGlimpse/FolderGlimpse.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o artifacts/FolderGlimpse-win-x64-self-contained
-```
+## Contributing
 
-## Design
+Bug reports, documentation corrections, and carefully scoped feature proposals are welcome.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before preparing a change. By submitting a
+contribution, you agree that it will be licensed under the project's MIT License. For security issues, follow
+[SECURITY.md](SECURITY.md) instead of creating a public issue.
 
-- .NET 8/WPF tool window with no Explorer injection; momentary mode never activates,
-  while sticky interaction explicitly takes focus and returns it when dismissed
-- conservative Shell automation + UI Automation Explorer snapshot worker
-- dedicated `WH_KEYBOARD_LL` thread; no filesystem, COM, UIA, WPF, or blocking work in
-  the hook callback
-- explicit, unit-tested tap/hold state machine
-- cancellable off-UI-thread folder inspection with configurable hidden-file, sort, and limit policies
-- compact ten-row viewport with a rounded theme-aware scrollbar for larger folders
-- native shell icons loaded after names appear, so icon extraction does not delay content
-- per-monitor-V2 physical-pixel positioning and work-area clamping
-- live system/light/dark theming, atomic JSON settings, and HKCU launch-at-sign-in control
-- one reusable control-center window with Home, embedded Settings, How to Use, and About;
-  a separate durable first-run state; and lightweight current-user named-pipe activation
-- deterministic launch intent: manual launch opens the shell, while `--startup` remains silent
-- shared Fluent-inspired WPF templates for cards, buttons, toggles, dropdowns, sliders,
-  and the same compact scrollbar in Settings and the preview
-- a custom light/dark tray renderer with modern spacing, rounded hover states, accent
-  checkmarks, and live synchronization with the selected app theme
+## Project direction
 
-See [the architecture decision](docs/architecture.md) and
-[manual integration checklist/results](docs/manual-testing.md).
+The current focus is reliability, safe Explorer integration, accessibility, and a polished
+Windows experience. A small official website may be added later as a clearer home for
+downloads and documentation; GitHub Releases remains the source of truth for binaries.
+If FolderGlimpse is useful to you, starring the repository is a welcome way to support it.
 
-## Current limitations
+Technical details are available in [docs/architecture.md](docs/architecture.md), with the
+Windows QA checklist in [docs/manual-testing.md](docs/manual-testing.md). Maintainers can
+also consult the [release runbook](docs/releasing.md), [signing guide](docs/signing.md), and
+[code-signing policy](docs/code-signing-policy.md), plus the [distribution roadmap](docs/distribution.md).
+The manual GitHub security controls are listed in
+[repository settings](docs/repository-settings.md).
 
-- V1 supports ordinary local filesystem folders only. UNC/network paths, ZIPs, Libraries,
-  This PC, Recycle Bin, and other virtual Shell namespaces are rejected.
-- Explorer integration is intentionally fail-closed. An elevated Explorer window or a
-  Windows build whose UI Automation tree cannot be proven safe will receive normal Space
-  behavior and show no preview.
-- Windows 11 tab disambiguation uses the focused UIA item name plus the matched Explorer
-  frame. Two tabs under the same frame selecting same-named folders are treated as
-  ambiguous and are rejected.
-- Momentary previews remain deliberately view-only. Sticky previews support selection and
-  activation, but do not navigate inside folders.
-- **Open file location** opens the containing directory but does not yet preselect the file.
-- The Properties action requests Windows' normal `properties` Shell verb; unavailable or
-  unassociated handlers fail with a safe in-popup message.
-- Click-away is detected through foreground/focus/selection polling; clicking the same
-  already-selected row may leave a sticky preview open. Space or Escape always closes it.
-- High contrast is not specially styled yet. The app follows light/dark app mode.
+## License
 
-FolderGlimpse works offline, performs no telemetry, does not modify previewed folders, and
-does not require administrator privileges.
-
-### Diagnostics
-
-If Explorer integration needs troubleshooting, start FolderGlimpse from PowerShell with
-`--diagnostics`. It writes `%LOCALAPPDATA%\FolderGlimpse\diagnostics.log`. The additional
-`--allow-injected-input` switch exists only for automated integration testing; normal
-launches continue rejecting injected keyboard events.
-
-Visual QA can render deterministic shell, Welcome, Settings, and preview snapshots with
-`--capture-main=<png> --capture-section=Home|Settings|HowToUse|About`,
-`--capture-welcome=<png>`,
-`--capture-settings=<png>`, `--capture-preview=<png> --preview-folder=<path>`, optional
-`--capture-tray=<png>`, `--capture-theme=Light|Dark`, `--capture-bottom`,
-`--capture-interaction`, and
-`--capture-interactive` for a deterministic selected-row preview.
+FolderGlimpse is open-source software licensed under the [MIT License](LICENSE).
+See [licensing notes](docs/licensing.md) for the project's contribution terms.
