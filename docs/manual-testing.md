@@ -10,6 +10,8 @@ diagnostics written to `artifacts/hover-runtime.log`:
 | Selected-folder mode after returning from visible Settings | Pass — App Certification Kit opened beside its selected row |
 | Any-folder mode on a selected row | Pass — Catalogs resolved through UIA + Shell and opened |
 | Any-folder mode on an unselected row | Pass — Remote remained selected while DesignTime was hovered and previewed |
+| Details Name column | Pass — hovering the folder name resolved the correct row and opened its glimpse |
+| Large Icons layout | Pass — hovering the folder tile resolved and opened its glimpse |
 | Windows 11 read-only Details cells reported as UIA Edit | Pass after differentiating read-only cells from writable search/rename edits |
 | Exit grace | Pass — leaving source and preview closed after the configured 200 ms delay |
 | Blank Explorer area | Pass — one failed resolution, no popup, no repeated stationary work |
@@ -127,6 +129,8 @@ folders and opens nothing automatically.
 - [ ] Select **Any folder** and hover several unselected folders without clicking. Verify the
       correct folder opens, fast pointer sweeps never flash stale previews, and A → B → C cannot
       publish an old A/B result over C.
+- [ ] Repeat any-folder hover over the Name column in Details view and over tiles in Medium,
+      Large, and Extra large icons views; verify the correct folder opens in every layout.
 - [ ] Exercise minimum/maximum open delay, exit delay, and movement tolerance. Move from the
       Explorer row into the preview during exit grace and verify it remains open.
 - [ ] Test None, exact Ctrl, and exact Shift hover modifiers. Verify extra modifiers, mouse

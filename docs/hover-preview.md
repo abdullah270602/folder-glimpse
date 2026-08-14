@@ -1,7 +1,8 @@
 # Hover preview specification
 
-Hover preview is an optional FolderGlimpse trigger. It never replaces the keyboard shortcut and
-is disabled by default. Users can choose one of two targeting modes:
+Hover is FolderGlimpse's pointer-first way to glimpse a folder without opening it or changing
+Explorer selection. It works alongside the configurable keyboard trigger rather than replacing
+it. Hover ships disabled until the user explicitly chooses one of two targeting modes:
 
 - **Selected folder** — preview only when the pointer rests on the single selected folder. This is
   the conservative V1 mode and reuses the existing selection/focus proof.
@@ -26,8 +27,10 @@ Settings are independent and persistent:
 - movement tolerance: 2–16 physical pixels;
 - modifier: None / Ctrl / Shift.
 
-The keyboard shortcut remains available in every mode. Changing hover settings cancels an active
-hover preview and applies to the next dwell.
+Keyboard access remains available in every hover mode. Users can configure Space or Ctrl+Space,
+then choose tap-to-toggle or hold-only behavior. These are alternative trigger styles; the app
+does not register arbitrary simultaneous keyboard shortcuts. Changing hover settings cancels an
+active hover glimpse and applies to the next dwell.
 
 ## Safety policy
 
