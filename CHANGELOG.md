@@ -1,7 +1,7 @@
 # Changelog
 
 All notable FolderGlimpse changes will be documented here. The project follows
-[Semantic Versioning](https://semver.org/) and uses annotated tags such as `v1.0.0`.
+[Semantic Versioning](https://semver.org/) and uses annotated tags such as `v0.1.0-beta.1`.
 
 ## Unreleased
 
@@ -37,5 +37,5 @@ All notable FolderGlimpse changes will be documented here. The project follows
 - Hover glimpses now accept file and folder double-clicks without taking keyboard focus; momentary
   previews remain view-only and sticky previews retain full selection and context actions.
 
-The owner will choose the first public release version after production signing and release QA
-are available. Prereleases use identifiers such as `v1.0.0-beta.1`.
+These unreleased changes are targeting the first public test build, `v0.1.0-beta.1`. The version
+will remain a prerelease until production signing and release QA are complete.
