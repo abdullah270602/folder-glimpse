@@ -32,5 +32,10 @@ All notable FolderGlimpse changes will be documented here. The project follows
 - Limited the preview viewport to ten visible rows with a cleaner themed scrollbar for longer
   folder listings.
 
+### Fixed
+
+- Hover glimpses now accept file and folder double-clicks without taking keyboard focus; momentary
+  previews remain view-only and sticky previews retain full selection and context actions.
+
 The owner will choose the first public release version after production signing and release QA
 are available. Prereleases use identifiers such as `v1.0.0-beta.1`.

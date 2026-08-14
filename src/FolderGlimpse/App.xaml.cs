@@ -254,16 +254,19 @@ public partial class App : System.Windows.Application
         switch (transition.Action)
         {
             case PeekAction.OpenSticky:
-                if (_gestureSnapshot is { IsEligible: true } stickySnapshot) _ = OpenPreviewAsync(stickySnapshot, _gestureSettings ?? _settings!.Current, true);
+                if (_gestureSnapshot is { IsEligible: true } stickySnapshot) _ = OpenPreviewAsync(stickySnapshot,
+                    _gestureSettings ?? _settings!.Current, PreviewInteractionMode.Sticky);
                 break;
             case PeekAction.OpenMomentary:
-                if (_gestureSnapshot is { IsEligible: true } snapshot) _ = OpenPreviewAsync(snapshot, _gestureSettings ?? _settings!.Current, false);
+                if (_gestureSnapshot is { IsEligible: true } snapshot) _ = OpenPreviewAsync(snapshot,
+                    _gestureSettings ?? _settings!.Current, PreviewInteractionMode.ViewOnly);
                 break;
             case PeekAction.Close: ClosePreview(); break;
         }
     }
 
-    private async Task OpenPreviewAsync(ExplorerSnapshot snapshot, FolderGlimpseSettings settings, bool sticky)
+    private async Task OpenPreviewAsync(ExplorerSnapshot snapshot, FolderGlimpseSettings settings,
+        PreviewInteractionMode interactionMode)
     {
         if (_preview is null || snapshot.FolderPath is null) return;
         var generation = Interlocked.Increment(ref _previewGeneration);
@@ -273,7 +276,7 @@ public partial class App : System.Windows.Application
         vm.FolderName = snapshot.DisplayName ?? Path.GetFileName(snapshot.FolderPath);
         vm.FolderPath = snapshot.FolderPath; vm.ShowPath = settings.ShowFullPath;
         _preview.ResetSelection(); vm.Entries.Clear(); vm.EntriesChanged(); vm.Loading = true; vm.Status = "Loading folder…";
-        _preview.ApplyTheme(_theme!); _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, sticky);
+        _preview.ApplyTheme(_theme!); _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, interactionMode);
 
         FolderContents contents;
         try
@@ -291,7 +294,7 @@ public partial class App : System.Windows.Application
         vm.Status = contents.Error ?? (contents.HasMore
             ? $"{settings.InitialItemLimit}+ items · showing first {settings.InitialItemLimit}"
             : $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}");
-        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, sticky);
+        _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, interactionMode);
         _ = LoadIconsAsync(contents, settings, generation, token);
     }
 
@@ -310,7 +313,8 @@ public partial class App : System.Windows.Application
             _state.SpaceUp();
             Volatile.Write(ref _stickyInputActive, 1);
         }
-        await OpenPreviewAsync(snapshot, captureSettings, interactive);
+        await OpenPreviewAsync(snapshot, captureSettings,
+            interactive ? PreviewInteractionMode.Sticky : PreviewInteractionMode.ViewOnly);
         await Task.Delay(captureDelayMs);
         if (interactive && captureSelection) _preview?.SelectFirstForCapture(3);
         _preview?.CaptureTo(output);
@@ -434,7 +438,7 @@ public partial class App : System.Windows.Application
         _hoverTarget = snapshot;
         _hoverPreviewActive = true;
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"hover open path={snapshot.FolderPath} generation={generation}");
-        _ = OpenPreviewAsync(snapshot, capturedSettings, false);
+        _ = OpenPreviewAsync(snapshot, capturedSettings, PreviewInteractionMode.HoverPointer);
     }
 
     private static bool Contains(PixelRect bounds, HoverPoint point) =>
@@ -489,11 +493,16 @@ public partial class App : System.Windows.Application
         _activationInProgress = true;
         try
         {
+            if (DiagnosticsLog.Enabled)
+                DiagnosticsLog.Write($"activation requested count={entries.Count} paths={string.Join('|', entries.Select(entry => entry.FullPath))}");
             var result = await _activation.OpenAsync(entries, options);
+            if (DiagnosticsLog.Enabled)
+                DiagnosticsLog.Write($"activation completed requested={result.RequestedCount} cancelled={result.Cancelled} error={result.Error ?? "<none>"}");
             if (result.Error is not null) { _preview.ViewModel.Status = result.Error; return; }
             if (result.RequestedCount > 0)
             {
-                if (settings.ClosePreviewAfterOpening) Apply(_state.Reset());
+                if (_hoverPreviewActive) CloseHoverPreview();
+                else if (settings.ClosePreviewAfterOpening) Apply(_state.Reset());
                 else { _detachedSticky = true; _preview.SetDetached(true); }
             }
         }
@@ -513,7 +522,10 @@ public partial class App : System.Windows.Application
             e.Previous.HoverMovementTolerancePx != e.Current.HoverMovementTolerancePx) CancelHoverPreview();
         _theme?.SetPreference(e.Current.Theme); ApplyTheme();
         if (e.Current.TapBehavior == TapBehavior.MomentaryOnly && _state.State == PeekState.StickyOpen) Apply(_state.Reset());
-        if (_preview?.IsVisible == true) _preview.ConfigureInteraction(_state.State == PeekState.StickyOpen, e.Current);
+        if (_preview?.IsVisible == true) _preview.ConfigureInteraction(
+            _hoverPreviewActive ? PreviewInteractionMode.HoverPointer :
+            _state.State == PeekState.StickyOpen ? PreviewInteractionMode.Sticky : PreviewInteractionMode.ViewOnly,
+            e.Current);
         _mainWindow?.RefreshState();
         ConfigureHoverTimer();
     }

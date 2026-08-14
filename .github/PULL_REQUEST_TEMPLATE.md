@@ -7,6 +7,7 @@ Describe the user-visible outcome and why the change is needed.
 - [ ] `dotnet build FolderGlimpse.sln -c Debug`
 - [ ] `dotnet build FolderGlimpse.sln -c Release`
 - [ ] `dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release`
+- [ ] `dotnet run --project tests/FolderGlimpse.UiTests/FolderGlimpse.UiTests.csproj -c Release`
 - [ ] Relevant Windows 11 manual checks completed
 - [ ] No secrets, certificates, generated binaries, or personal paths were added
 

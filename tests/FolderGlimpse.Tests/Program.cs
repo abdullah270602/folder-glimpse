@@ -21,6 +21,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Product identity metadata", TestProductIdentity),
     ("Interactive selection model", TestSelection),
     ("Safe item activation", TestActivation),
+    ("Preview interaction routing", TestPreviewInteractionRouting),
     ("Context action policy", TestContextActions),
     ("Popup positioning", TestPositioning)
 };
@@ -567,6 +568,16 @@ static async Task TestActivation()
         Sequence(["file:" + fileA, "file:" + fileB, "folder:" + folder], launcher.Requests, "mixed items use correct shell operations");
 
         launcher.Requests.Clear();
+        var singleFolder = await service.OpenAsync([entries[2]], new(true, false, 5));
+        Equal(1, singleFolder.RequestedCount, "single folder still opens when multi-open is disabled");
+        Sequence(["folder:" + folder], launcher.Requests, "single folder uses folder shell activation");
+
+        launcher.Requests.Clear();
+        var exactThreshold = await service.OpenAsync(Enumerable.Repeat(entries[1], 5).ToArray(), new(true, true, 5));
+        False(exactThreshold.ConfirmationRequested, "exact confirmation threshold opens without prompting");
+        Equal(5, exactThreshold.RequestedCount, "exact threshold opens every requested item");
+
+        launcher.Requests.Clear();
         var six = Enumerable.Repeat(entries[1], 6).ToArray();
         var confirmed = await service.OpenAsync(six, new(true, true, 5));
         True(confirmed.ConfirmationRequested && !confirmed.Cancelled, "six items over threshold five confirm first");
@@ -590,11 +601,74 @@ static async Task TestActivation()
         Equal(0, launcher.Requests.Count, "missing file never reaches launcher");
 
         launcher.Requests.Clear();
+        Directory.Delete(folder);
+        launcher.MissingPaths.Add(folder);
+        var missingFolder = await service.OpenAsync([entries[2]], new());
+        Equal(0, missingFolder.RequestedCount, "missing folder is skipped gracefully");
+        Equal(0, launcher.Requests.Count, "missing folder never reaches successful requests");
+
+        launcher.Requests.Clear();
         var disabled = await service.OpenAsync([entries[1]], new(false, true, 5));
         Equal(0, disabled.RequestedCount, "interaction disabled prevents activation");
         Equal(0, launcher.Requests.Count, "interaction disabled never reaches launcher");
+
+        launcher.FailingPaths.Add(fileB);
+        await ThrowsAsync<InvalidOperationException>(() => service.OpenAsync([entries[1]], new()),
+            "unexpected shell launch failures reach the UI error boundary");
+
+        using var cancelledSource = new CancellationTokenSource();
+        cancelledSource.Cancel();
+        await ThrowsAsync<OperationCanceledException>(() => service.OpenAsync([entries[1]], new(), cancelledSource.Token),
+            "pre-cancelled activation does not invoke the shell");
     }
     finally { Directory.Delete(root, true); }
+}
+
+static Task TestPreviewInteractionRouting()
+{
+    var file = new FolderEntry("file.txt", @"C:\Root\file.txt", false, 1, DateTimeOffset.UtcNow);
+    var folder = new FolderEntry("Folder", @"C:\Root\Folder", true, null, DateTimeOffset.UtcNow);
+    var defaults = FolderGlimpseSettings.Default;
+
+    False(ItemActionPolicy.CanHitTestEntries(PreviewInteractionMode.ViewOnly, defaults), "momentary/view-only previews ignore pointer input");
+    True(ItemActionPolicy.CanHitTestEntries(PreviewInteractionMode.HoverPointer, defaults), "hover previews accept pointer input");
+    True(ItemActionPolicy.CanHitTestEntries(PreviewInteractionMode.Sticky, defaults), "sticky previews accept pointer input");
+    False(ItemActionPolicy.CanSelect(PreviewInteractionMode.HoverPointer, defaults), "hover click does not steal selection or keyboard focus");
+    True(ItemActionPolicy.CanSelect(PreviewInteractionMode.Sticky, defaults), "sticky preview supports selection");
+
+    True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, folder, defaults), "hover double-click opens folders");
+    True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, file, defaults), "hover double-click opens files");
+    True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.Sticky, folder, defaults), "sticky double-click opens folders");
+    False(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.ViewOnly, folder, defaults), "view-only preview never activates folders");
+    False(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, folder,
+        defaults with { DoubleClickFoldersToOpen = false }), "folder double-click setting applies to hover");
+    False(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, file,
+        defaults with { DoubleClickFilesToOpen = false }), "file double-click setting applies to hover");
+
+    var hoverFolderTargets = ItemActionPolicy.ActivationTargetsForDoubleClick(
+        PreviewInteractionMode.HoverPointer, folder, defaults);
+    Equal(1, hoverFolderTargets.Count, "hover double-click routes one exact entry");
+    Equal(folder.FullPath, hoverFolderTargets[0].FullPath, "hover double-click routes the clicked folder, not a stale selection");
+    Equal(0, ItemActionPolicy.ActivationTargetsForDoubleClick(
+        PreviewInteractionMode.ViewOnly, folder, defaults).Count, "view-only double-click routes no target");
+    Equal(0, ItemActionPolicy.ActivationTargetsForDoubleClick(
+        PreviewInteractionMode.HoverPointer, file,
+        defaults with { DoubleClickFilesToOpen = false }).Count, "disabled file activation routes no target");
+
+    False(ItemActionPolicy.CanUseContextActions(PreviewInteractionMode.HoverPointer, defaults), "hover remains non-activating and has no context menu");
+    True(ItemActionPolicy.CanUseContextActions(PreviewInteractionMode.Sticky, defaults), "sticky context actions remain available");
+    False(ItemActionPolicy.CanUseContextActions(PreviewInteractionMode.Sticky,
+        defaults with { RightClickActions = false }), "context-action setting is respected");
+
+    var disabled = defaults with { InteractiveItems = false };
+    foreach (var mode in Enum.GetValues<PreviewInteractionMode>())
+    {
+        False(ItemActionPolicy.CanHitTestEntries(mode, disabled), $"interaction master switch blocks hit testing in {mode}");
+        False(ItemActionPolicy.CanSelect(mode, disabled), $"interaction master switch blocks selection in {mode}");
+        False(ItemActionPolicy.CanDoubleClick(mode, folder, disabled), $"interaction master switch blocks folder activation in {mode}");
+        False(ItemActionPolicy.CanUseContextActions(mode, disabled), $"interaction master switch blocks context actions in {mode}");
+    }
+    return Task.CompletedTask;
 }
 
 static Task TestContextActions()
@@ -606,11 +680,8 @@ static Task TestContextActions()
     Sequence([ItemAction.Open, ItemAction.CopyPaths], ItemActionPolicy.Available([file, folder], true), "multiple actions");
     Equal(@"C:\Root\file.txt" + Environment.NewLine + @"C:\Root\Folder", ItemActionPolicy.PathsForClipboard([file, folder]), "copy paths uses newlines");
     Equal(0, ItemActionPolicy.Available([file], false).Count, "disabled right-click has no actions");
-    True(ItemActionPolicy.CanDoubleClick(file, FolderGlimpseSettings.Default), "file double-click enabled by default");
-    True(ItemActionPolicy.CanDoubleClick(folder, FolderGlimpseSettings.Default), "folder double-click enabled by default");
-    False(ItemActionPolicy.CanDoubleClick(file, FolderGlimpseSettings.Default with { InteractiveItems = false }), "interaction disabled blocks double-click");
-    False(ItemActionPolicy.CanDoubleClick(file, FolderGlimpseSettings.Default with { DoubleClickFilesToOpen = false }), "file activation setting blocks file");
-    False(ItemActionPolicy.CanDoubleClick(folder, FolderGlimpseSettings.Default with { DoubleClickFoldersToOpen = false }), "folder activation setting blocks folder");
+    True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.Sticky, file, FolderGlimpseSettings.Default), "file double-click enabled by default");
+    True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.Sticky, folder, FolderGlimpseSettings.Default), "folder double-click enabled by default");
     return Task.CompletedTask;
 }
 
@@ -655,8 +726,9 @@ sealed class FakeShellLauncher : IShellLauncher
 {
     public List<string> Requests { get; } = [];
     public HashSet<string> MissingPaths { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public Task OpenFileAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new FileNotFoundException(); Requests.Add("file:" + path); return Task.CompletedTask; }
-    public Task OpenFolderAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new DirectoryNotFoundException(); Requests.Add("folder:" + path); return Task.CompletedTask; }
+    public HashSet<string> FailingPaths { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Task OpenFileAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new FileNotFoundException(); if (FailingPaths.Contains(path)) throw new InvalidOperationException(); Requests.Add("file:" + path); return Task.CompletedTask; }
+    public Task OpenFolderAsync(string path, CancellationToken cancellationToken = default) { if (MissingPaths.Contains(path)) throw new DirectoryNotFoundException(); if (FailingPaths.Contains(path)) throw new InvalidOperationException(); Requests.Add("folder:" + path); return Task.CompletedTask; }
     public Task OpenFileLocationAsync(string path, CancellationToken cancellationToken = default) { Requests.Add("location:" + path); return Task.CompletedTask; }
     public Task ShowPropertiesAsync(string path, CancellationToken cancellationToken = default) { Requests.Add("properties:" + path); return Task.CompletedTask; }
 }

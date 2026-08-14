@@ -39,6 +39,7 @@ dotnet restore FolderGlimpse.sln --configfile NuGet.config
 dotnet build FolderGlimpse.sln -c Debug --no-restore
 dotnet build FolderGlimpse.sln -c Release --no-restore
 dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release --no-build
+dotnet run --project tests/FolderGlimpse.UiTests/FolderGlimpse.UiTests.csproj -c Release --no-build
 ```
 
 Run a safe unsigned packaging rehearsal through GitHub Actions using **Release → Run workflow**.

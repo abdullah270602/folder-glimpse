@@ -105,7 +105,9 @@ WPF was chosen over WinUI 3. FolderGlimpse's difficult work is HWND/COM/UIA inte
 which WinUI provides no simplification, while Windows App SDK would add deployment and
 bootstrap complexity. The popup always uses `WS_EX_TOOLWINDOW`. Momentary/read-only mode
 additionally uses `WS_EX_NOACTIVATE`, `ShowActivated=false`, and
-`SetWindowPos(... SWP_NOACTIVATE)`. Sticky interactive mode removes the no-activate style,
+`SetWindowPos(... SWP_NOACTIVATE)`. Hover mode keeps that style while enabling row hit-testing
+only for pointer double-click activation; it does not accept keyboard focus or selection. Sticky
+interactive mode removes the no-activate style,
 takes foreground focus, and restores the captured Explorer frame when the user dismisses it.
 Because Windows may reject an immediate cross-thread foreground request, the handoff briefly
 attaches only the WPF and current foreground input queues, sets focus, and detaches in `finally`.

@@ -1,5 +1,12 @@
 # Windows integration test checklist
 
+## Automated regression gates
+
+Every push and pull request builds the complete solution, runs the Core behavior suite, and runs
+the Windows/WPF interaction suite. The WPF suite instantiates the real preview window and verifies
+that hover rows accept pointer hit-testing without taking keyboard focus, while momentary previews
+remain view-only and sticky previews retain selection and keyboard interaction.
+
 ## Hover runtime verification — 2026-08-14
 
 The Release build was exercised against Windows 11 File Explorer in Details view, with
@@ -129,6 +136,11 @@ folders and opens nothing automatically.
 - [ ] Select **Any folder** and hover several unselected folders without clicking. Verify the
       correct folder opens, fast pointer sweeps never flash stale previews, and A → B → C cannot
       publish an old A/B result over C.
+- [ ] Move into an open hover glimpse and double-click a child folder, then a file. Verify Windows
+      opens the exact item, the glimpse closes, and Explorer retained keyboard focus until launch.
+- [ ] In a hover glimpse, verify single-click, right-click, selection checkboxes, and keyboard input
+      do not enter sticky interaction mode. Disable each double-click setting and verify its matching
+      item type no longer opens.
 - [ ] Repeat any-folder hover over the Name column in Details view and over tiles in Medium,
       Large, and Extra large icons views; verify the correct folder opens in every layout.
 - [ ] Exercise minimum/maximum open delay, exit delay, and movement tolerance. Move from the

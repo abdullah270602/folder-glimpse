@@ -53,10 +53,31 @@ public sealed class ItemActivationService(IShellLauncher launcher, IOpenManyConf
 
 public enum ItemAction { Open, OpenFileLocation, CopyPath, CopyPaths, Properties }
 
+public enum PreviewInteractionMode
+{
+    ViewOnly,
+    HoverPointer,
+    Sticky
+}
+
 public static class ItemActionPolicy
 {
-    public static bool CanDoubleClick(FolderEntry entry, FolderGlimpseSettings settings) =>
-        settings.InteractiveItems && (entry.IsDirectory ? settings.DoubleClickFoldersToOpen : settings.DoubleClickFilesToOpen);
+    public static bool CanHitTestEntries(PreviewInteractionMode mode, FolderGlimpseSettings settings) =>
+        settings.InteractiveItems && mode is PreviewInteractionMode.HoverPointer or PreviewInteractionMode.Sticky;
+
+    public static bool CanSelect(PreviewInteractionMode mode, FolderGlimpseSettings settings) =>
+        settings.InteractiveItems && mode == PreviewInteractionMode.Sticky;
+
+    public static bool CanDoubleClick(PreviewInteractionMode mode, FolderEntry entry, FolderGlimpseSettings settings) =>
+        CanHitTestEntries(mode, settings) &&
+        (entry.IsDirectory ? settings.DoubleClickFoldersToOpen : settings.DoubleClickFilesToOpen);
+
+    public static IReadOnlyList<FolderEntry> ActivationTargetsForDoubleClick(
+        PreviewInteractionMode mode, FolderEntry clickedEntry, FolderGlimpseSettings settings) =>
+        CanDoubleClick(mode, clickedEntry, settings) ? [clickedEntry] : [];
+
+    public static bool CanUseContextActions(PreviewInteractionMode mode, FolderGlimpseSettings settings) =>
+        CanSelect(mode, settings) && settings.RightClickActions;
 
     public static IReadOnlyList<ItemAction> Available(IReadOnlyList<FolderEntry> selected, bool enabled)
     {

@@ -26,6 +26,9 @@
     <ProjectReference Include="..\FolderGlimpse.Core\FolderGlimpse.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="FolderGlimpse.UiTests" />
+  </ItemGroup>
+  <ItemGroup>
     <Resource Include="Assets\Branding\FolderGlimpse-App.ico" />
     <Resource Include="Assets\Branding\FolderGlimpse-Tray.ico" />
     <Resource Include="Assets\Branding\FolderGlimpse-Mark-256.png" />
