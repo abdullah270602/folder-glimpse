@@ -22,6 +22,14 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
 - `Input` owns a `WH_KEYBOARD_LL` hook and an explicit tap/hold state machine. The hook
   performs no COM, UIA, filesystem, WPF, or blocking work. It may consume Space only
   from a fresh eligible snapshot whose HWND still equals `GetForegroundWindow()`.
+- Optional hover input uses a separate 20 Hz sampler that is stopped while hover is off.
+  Before the dwell threshold it performs only cursor, modifier, mouse-button, and foreground
+  HWND checks. Any-folder resolution is latest-request-wins on isolated UIA MTA and Shell STA
+  workers; enumeration and icon extraction remain in the cancellable preview pipeline.
+- Explorer eligibility refresh is event-driven. Out-of-context WinEvent hooks invalidate on
+  foreground, focus, selection, and item-location changes; a 75 ms debounce avoids querying UIA
+  while Explorer is rebuilding a row, and a slow three-second fallback covers providers that
+  omit events. This replaces continuous cross-process UIA/Shell polling.
 - `FolderInspection` enumerates only immediate children, asynchronously, with
   cancellation and a bounded initial result set. Directories sort before files.
 - `Preview` is one reusable WPF tool window. Momentary mode remains non-activating and

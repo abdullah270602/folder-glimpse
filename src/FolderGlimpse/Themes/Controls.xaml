@@ -52,8 +52,9 @@
     <Setter Property="Background" Value="{DynamicResource ControlBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Margin" Value="0,0,0,8" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+    <Setter Property="MinHeight" Value="64" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
   <Style x:Key="SettingRowStyle" TargetType="Border">

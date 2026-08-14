@@ -9,9 +9,12 @@ var tests = new (string Name, Func<Task> Run)[]
 {
     ("Tap/hold state machine", TestStateMachine),
     ("Input eligibility policy", TestEligibility),
+    ("Hover preview state and eligibility", TestHoverPreview),
+    ("Hover UI Automation ancestry policy", TestHoverElementPolicy),
     ("Explorer focus ancestry policy", TestExplorerFocusPolicy),
     ("Folder enumeration", TestEnumeration),
     ("Settings persistence and recovery", TestSettings),
+    ("Settings scroll policy", TestSettingsScroll),
     ("Settings location migration", TestSettingsMigration),
     ("Startup registration migration", TestStartupMigration),
     ("Launch, onboarding, and activation policy", TestApplicationLifecycle),
@@ -90,6 +93,132 @@ static Task TestEligibility()
     False(EligibilityPolicy.CanOwnSpace(new(true, false, false, 42, 84, now.AddSeconds(1)), eligible, TimeSpan.FromMilliseconds(350)), "stale snapshot rejected");
     False(EligibilityPolicy.CanOwnSpace(new(true, false, false, 42, 84, now), eligible with { IsEligible = false }, TimeSpan.FromMilliseconds(350)), "focus/search rejection respected");
     False(EligibilityPolicy.CanOwnSpace(new(true, false, false, 42, 84, now), null, TimeSpan.FromMilliseconds(350)), "missing snapshot rejected");
+    return Task.CompletedTask;
+}
+
+static Task TestHoverPreview()
+{
+    var machine = new HoverPreviewStateMachine();
+    var start = DateTimeOffset.UtcNow;
+    var point = new HoverPoint(120, 240);
+    var dwell = TimeSpan.FromMilliseconds(650);
+    Equal(HoverPhase.Dwelling, machine.ObserveCandidate(point, start, 6, dwell).Phase, "first candidate begins dwell");
+    Equal(HoverAction.None, machine.ObserveCandidate(new(124, 242), start.AddMilliseconds(649), 6, dwell).Action,
+        "small movement below dwell threshold does not resolve");
+    var resolve = machine.ObserveCandidate(new(124, 242), start.AddMilliseconds(650), 6, dwell);
+    Equal(HoverAction.Resolve, resolve.Action, "stable dwell resolves at configured threshold");
+    Equal(HoverAction.None, machine.Resolved(resolve.Generation + 1, true).Action, "stale resolver result is ignored");
+    Equal(HoverAction.Open, machine.Resolved(resolve.Generation, true).Action, "current eligible result opens");
+    Equal(HoverPhase.ClosingGrace, machine.ObserveOpen(false, start.AddMilliseconds(700), TimeSpan.FromMilliseconds(250)).Phase,
+        "leaving source begins close grace");
+    Equal(HoverPhase.Open, machine.ObserveOpen(true, start.AddMilliseconds(800), TimeSpan.FromMilliseconds(250)).Phase,
+        "moving into preview cancels close grace");
+    machine.ObserveOpen(false, start.AddMilliseconds(900), TimeSpan.FromMilliseconds(250));
+    Equal(HoverAction.Close, machine.ObserveOpen(false, start.AddMilliseconds(1150), TimeSpan.FromMilliseconds(250)).Action,
+        "preview closes after configured grace");
+
+    machine = new HoverPreviewStateMachine();
+    var first = machine.ObserveCandidate(point, start, 6, dwell);
+    var moved = machine.ObserveCandidate(new(127, 240), start.AddMilliseconds(640), 6, dwell);
+    True(moved.Generation > first.Generation, "movement beyond tolerance restarts dwell generation");
+    Equal(HoverAction.None, machine.ObserveCandidate(new(127, 240), start.AddMilliseconds(650), 6, dwell).Action,
+        "movement restart prevents premature resolve");
+
+    machine = new HoverPreviewStateMachine();
+    machine.ObserveCandidate(point, start, 6, dwell);
+    var rejectedResolve = machine.ObserveCandidate(point, start.Add(dwell), 6, dwell);
+    Equal(HoverPhase.Rejected, machine.Resolved(rejectedResolve.Generation, false).Phase, "failed resolution is negatively cached");
+    Equal(HoverAction.None, machine.ObserveCandidate(point, start.AddSeconds(5), 6, dwell).Action,
+        "stationary rejected target is not resolved repeatedly");
+    Equal(HoverPhase.Dwelling, machine.ObserveCandidate(new(127, 240), start.AddSeconds(5), 6, dwell).Phase,
+        "moving beyond tolerance clears the negative cache");
+    var idleGeneration = new HoverPreviewStateMachine().Generation;
+    var idleCancel = new HoverPreviewStateMachine().Cancel();
+    Equal(idleGeneration, idleCancel.Generation, "idle cancellation is allocation-free state churn");
+
+    True(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.None, false, false, false, false), "no-modifier mode accepts clean hover");
+    False(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.None, true, false, false, false), "no-modifier mode rejects Ctrl");
+    True(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.Control, true, false, false, false), "Ctrl mode accepts exact Ctrl");
+    False(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.Control, true, true, false, false), "Ctrl mode rejects extra Shift");
+    True(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.Shift, false, true, false, false), "Shift mode accepts exact Shift");
+    False(HoverEligibilityPolicy.IsModifierMatch(HoverModifier.Shift, false, true, true, false), "all modes reject Alt");
+    True(HoverEligibilityPolicy.CanSample(true, HoverPreviewMode.AnyFolder, true, false),
+        "visible control center does not independently disable Explorer hover sampling");
+    False(HoverEligibilityPolicy.CanSample(true, HoverPreviewMode.Off, true, false), "off mode has zero sampling");
+    False(HoverEligibilityPolicy.CanSample(false, HoverPreviewMode.AnyFolder, true, false), "disabled app does not sample");
+    False(HoverEligibilityPolicy.CanSample(true, HoverPreviewMode.AnyFolder, false, false), "keyboard ownership preempts hover");
+    False(HoverEligibilityPolicy.CanSample(true, HoverPreviewMode.AnyFolder, true, true), "item activation preempts hover");
+
+    var bounds = new PixelRect(100, 200, 300, 280);
+    var snapshot = new ExplorerSnapshot(true, "Eligible", 42, 84, 7, @"C:\Folder", "Folder", bounds, start, 1);
+    True(HoverEligibilityPolicy.CanUseSelectedSnapshot(snapshot, 42, point, start.AddMilliseconds(100), TimeSpan.FromMilliseconds(350)),
+        "fresh selected folder under pointer is accepted");
+    False(HoverEligibilityPolicy.CanUseSelectedSnapshot(snapshot, 99, point, start, TimeSpan.FromMilliseconds(350)),
+        "other foreground window is rejected");
+    False(HoverEligibilityPolicy.CanUseSelectedSnapshot(snapshot, 42, new(301, 240), start, TimeSpan.FromMilliseconds(350)),
+        "pointer outside selected row is rejected");
+    False(HoverEligibilityPolicy.CanUseSelectedSnapshot(snapshot, 42, point, start.AddSeconds(1), TimeSpan.FromMilliseconds(350)),
+        "stale selection is rejected");
+    False(HoverEligibilityPolicy.CanUseSelectedSnapshot(snapshot with { ItemBounds = null }, 42, point, start, TimeSpan.FromMilliseconds(350)),
+        "missing item bounds fail closed");
+
+    var steady = new HoverPreviewStateMachine();
+    steady.ObserveCandidate(point, start, 6, dwell);
+    var steadyResolve = steady.ObserveCandidate(point, start.Add(dwell), 6, dwell);
+    steady.Resolved(steadyResolve.Generation, false);
+    var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+    for (var index = 0; index < 100_000; index++)
+        steady.ObserveCandidate(point, start.AddSeconds(2), 6, dwell);
+    var steadyAllocations = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+    True(steadyAllocations <= 1024, "steady rejected-target sampling remains effectively allocation-free");
+    return Task.CompletedTask;
+}
+
+static Task TestSettingsScroll()
+{
+    Equal(-56d, SettingsScrollPolicy.OffsetDelta(120), "one wheel notch scrolls up one controlled step");
+    Equal(56d, SettingsScrollPolicy.OffsetDelta(-120), "one wheel notch scrolls down one controlled step");
+    Equal(-28d, SettingsScrollPolicy.OffsetDelta(60), "high-resolution half-notch input stays proportional");
+    Equal(0d, SettingsScrollPolicy.OffsetDelta(0), "zero wheel delta does not move content");
+    return Task.CompletedTask;
+}
+
+static Task TestHoverElementPolicy()
+{
+    const int explorerPid = 1200;
+    var explorerWindow = new nint(2400);
+    HoverElementNode[] itemTree =
+    [
+        new(explorerPid, 0, false, false, true),
+        new(explorerPid, 0, false, true, false),
+        new(explorerPid, explorerWindow, false, false, false)
+    ];
+    True(HoverElementPolicy.Assess(itemTree, explorerPid, explorerWindow).IsEligible,
+        "file-list item inside foreground Explorer is accepted");
+    False(HoverElementPolicy.Assess([
+        new(explorerPid, 0, true, false, true),
+        new(explorerPid, explorerWindow, false, true, false)
+    ], explorerPid, explorerWindow).IsEligible, "menu and tree surfaces fail closed");
+    True(HoverElementPolicy.Assess([
+        new(explorerPid, 0, false, false, false),
+        new(explorerPid, 0, false, false, true),
+        new(explorerPid, 0, false, true, false),
+        new(explorerPid, explorerWindow, false, false, false)
+    ], explorerPid, explorerWindow).IsEligible, "Windows 11 read-only details cells inherit valid file-item ancestry");
+    False(HoverElementPolicy.Assess([
+        new(999, 0, false, false, true),
+        new(explorerPid, explorerWindow, false, true, false)
+    ], explorerPid, explorerWindow).IsEligible, "foreign-process ancestry fails closed");
+    False(HoverElementPolicy.Assess([
+        new(explorerPid, 0, false, false, true),
+        new(explorerPid, explorerWindow, false, false, false)
+    ], explorerPid, explorerWindow).IsEligible, "navigation/details items without ItemsView fail closed");
+    False(HoverElementPolicy.Assess([
+        new(explorerPid, 0, false, true, false),
+        new(explorerPid, explorerWindow, false, false, false)
+    ], explorerPid, explorerWindow).IsEligible, "blank file-list space fails closed");
+    False(HoverElementPolicy.Assess(itemTree[..2], explorerPid, explorerWindow).IsEligible,
+        "ancestry that never reaches foreground frame fails closed");
     return Task.CompletedTask;
 }
 
@@ -191,7 +320,14 @@ static Task TestSettings()
         False(service.Current.ShowSelectionCheckboxes, "selection checkboxes default off");
         True(service.Current.AllowOpeningMultipleItems && service.Current.ClosePreviewAfterOpening, "safe opening defaults on");
         Equal(5, service.Current.ConfirmBeforeOpeningMoreThan, "confirmation default is five");
+        Equal(HoverPreviewMode.Off, service.Current.HoverMode, "hover is opt-in by default");
+        Equal(650, service.Current.HoverOpenDelayMs, "hover delay has a conservative default");
+        Equal(250, service.Current.HoverCloseDelayMs, "hover close grace has a usable default");
+        Equal(6, service.Current.HoverMovementTolerancePx, "hover movement tolerance defaults to six pixels");
+        Equal(HoverModifier.None, service.Current.HoverModifier, "hover requires no modifier by default");
         True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100,
+            HoverMode = HoverPreviewMode.AnyFolder, HoverModifier = HoverModifier.Control,
+            HoverOpenDelayMs = 900, HoverCloseDelayMs = 400, HoverMovementTolerancePx = 10,
             InteractiveItems = false, DoubleClickFilesToOpen = false, DoubleClickFoldersToOpen = false,
             RightClickActions = false, MultiSelection = false, ShowSelectionCheckboxes = true,
             AllowOpeningMultipleItems = false, ConfirmBeforeOpeningMoreThan = 12, ClosePreviewAfterOpening = false }, out _), "settings update persists");
@@ -207,6 +343,11 @@ static Task TestSettings()
         False(reloaded.Current.RightClickActions, "right-click setting round trips");
         False(reloaded.Current.MultiSelection, "multi-selection setting round trips");
         False(reloaded.Current.ClosePreviewAfterOpening, "close-after-open setting round trips");
+        Equal(HoverPreviewMode.AnyFolder, reloaded.Current.HoverMode, "hover mode round trips");
+        Equal(HoverModifier.Control, reloaded.Current.HoverModifier, "hover modifier round trips");
+        Equal(900, reloaded.Current.HoverOpenDelayMs, "hover open delay round trips");
+        Equal(400, reloaded.Current.HoverCloseDelayMs, "hover close delay round trips");
+        Equal(10, reloaded.Current.HoverMovementTolerancePx, "hover movement tolerance round trips");
 
         File.WriteAllText(path, "{ \"showFileSize\": false, \"unknownFutureField\": 123 }");
         reloaded.Load();
@@ -216,11 +357,19 @@ static Task TestSettings()
         File.WriteAllText(path, "{ not-json");
         reloaded.Load();
         Equal(FolderGlimpseSettings.Default, reloaded.Current, "malformed settings recover to defaults");
-        True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17, ConfirmBeforeOpeningMoreThan = 500 }, out _), "invalid values normalize");
+        True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17,
+            HoverOpenDelayMs = 1, HoverCloseDelayMs = 9000, HoverMovementTolerancePx = 100,
+            HoverMode = (HoverPreviewMode)999, HoverModifier = (HoverModifier)999,
+            ConfirmBeforeOpeningMoreThan = 500 }, out _), "invalid values normalize");
         Equal(700d, reloaded.Current.PopupWidth, "width clamps high");
         Equal(100, reloaded.Current.HoldThresholdMs, "hold delay clamps low");
         Equal(50, reloaded.Current.InitialItemLimit, "unsupported item limit resets");
         Equal(50, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps high");
+        Equal(150, reloaded.Current.HoverOpenDelayMs, "hover open delay clamps low");
+        Equal(1000, reloaded.Current.HoverCloseDelayMs, "hover close delay clamps high");
+        Equal(16, reloaded.Current.HoverMovementTolerancePx, "hover tolerance clamps high");
+        Equal(HoverPreviewMode.Off, reloaded.Current.HoverMode, "invalid hover mode fails to off");
+        Equal(HoverModifier.None, reloaded.Current.HoverModifier, "invalid hover modifier fails to none");
         True(reloaded.TryUpdate(s => s with { ConfirmBeforeOpeningMoreThan = 1 }, out _), "low confirmation threshold normalizes");
         Equal(2, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps low");
     }

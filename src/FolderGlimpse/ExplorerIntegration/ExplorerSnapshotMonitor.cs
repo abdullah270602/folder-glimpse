@@ -11,15 +11,27 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
 {
     private readonly Thread _thread;
     private readonly CancellationTokenSource _stop = new();
+    private readonly NativeMethods.WinEventProc _winEventCallback;
+    private readonly System.Threading.Timer _eventDebounce;
     private ExplorerSnapshot _current = ExplorerSnapshot.Ineligible("Starting", DateTimeOffset.UtcNow);
     private Task<FocusResult>? _focusTask;
     private long _generation;
+    private nint _currentExplorerWindow;
+    private int _currentExplorerProcessId;
     private string? _lastDiagnostic;
+    private uint _threadId;
+    private int _refreshPosted;
+    private int _invalidated = 1;
 
     internal ExplorerSnapshot Current => Volatile.Read(ref _current);
+    internal bool IsInvalidated => Volatile.Read(ref _invalidated) == 1;
+    internal nint CurrentExplorerWindow => Volatile.Read(ref _currentExplorerWindow);
+    internal int CurrentExplorerProcessId => Volatile.Read(ref _currentExplorerProcessId);
 
     internal ExplorerSnapshotMonitor()
     {
+        _winEventCallback = OnWinEvent;
+        _eventDebounce = new System.Threading.Timer(_ => PostRefresh(), null, Timeout.Infinite, Timeout.Infinite);
         _thread = new Thread(Run) { IsBackground = true, Name = "FolderGlimpse Explorer monitor" };
         _thread.SetApartmentState(ApartmentState.STA);
     }
@@ -28,27 +40,83 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
 
     private void Run()
     {
-        while (!_stop.IsCancellationRequested)
+        _threadId = NativeMethods.GetCurrentThreadId();
+        var foregroundHook = NativeMethods.SetWinEventHook(NativeMethods.EventSystemForeground,
+            NativeMethods.EventSystemForeground, 0, _winEventCallback, 0, 0,
+            NativeMethods.WineventOutOfContext | NativeMethods.WineventSkipOwnProcess);
+        var focusSelectionHook = NativeMethods.SetWinEventHook(NativeMethods.EventObjectFocus,
+            NativeMethods.EventObjectSelectionWithin, 0, _winEventCallback, 0, 0,
+            NativeMethods.WineventOutOfContext | NativeMethods.WineventSkipOwnProcess);
+        var locationHook = NativeMethods.SetWinEventHook(NativeMethods.EventObjectLocationChange,
+            NativeMethods.EventObjectLocationChange, 0, _winEventCallback, 0, 0,
+            NativeMethods.WineventOutOfContext | NativeMethods.WineventSkipOwnProcess);
+        using var fallback = new System.Threading.Timer(_ => RequestRefresh(false), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+        try
         {
-            ExplorerSnapshot snapshot;
-            try { snapshot = Capture(); }
-            catch (Exception exception)
+            PublishCapture();
+            while (NativeMethods.GetMessage(out var message, 0, 0, 0) > 0)
             {
-                Debug.WriteLine($"FolderGlimpse monitor recovered: {exception}");
-                snapshot = ExplorerSnapshot.Ineligible("Integration worker error", DateTimeOffset.UtcNow, Interlocked.Increment(ref _generation));
+                if (message.Message != NativeMethods.WmAppRefreshExplorer) continue;
+                Volatile.Write(ref _refreshPosted, 0);
+                PublishCapture();
             }
-            Volatile.Write(ref _current, snapshot);
-            if (DiagnosticsLog.Enabled)
-            {
-                var diagnostic = $"snapshot eligible={snapshot.IsEligible} reason={snapshot.Reason} hwnd=0x{snapshot.ForegroundWindow:X} focus=0x{snapshot.FocusWindow:X} path={snapshot.FolderPath ?? "<none>"}";
-                if (!string.Equals(diagnostic, _lastDiagnostic, StringComparison.Ordinal))
-                {
-                    _lastDiagnostic = diagnostic;
-                    DiagnosticsLog.Write(diagnostic);
-                }
-            }
-            _stop.Token.WaitHandle.WaitOne(80);
         }
+        finally
+        {
+            if (locationHook != 0) NativeMethods.UnhookWinEvent(locationHook);
+            if (focusSelectionHook != 0) NativeMethods.UnhookWinEvent(focusSelectionHook);
+            if (foregroundHook != 0) NativeMethods.UnhookWinEvent(foregroundHook);
+        }
+    }
+
+    private void OnWinEvent(nint hook, uint eventType, nint window, int objectId, int childId, uint eventThread, uint eventTime)
+    {
+        if (eventType != NativeMethods.EventSystemForeground)
+        {
+            if (window == 0 || CurrentExplorerProcessId == 0) return;
+            NativeMethods.GetWindowThreadProcessId(window, out var processId);
+            if (processId != (uint)CurrentExplorerProcessId) return;
+        }
+        RequestRefresh(true);
+    }
+
+    private void RequestRefresh(bool debounce)
+    {
+        Volatile.Write(ref _invalidated, 1);
+        if (debounce)
+        {
+            // Explorer emits focus, selection, and location notifications as a burst. Waiting
+            // briefly avoids querying UIA while its provider is still rebuilding the row.
+            _eventDebounce.Change(75, Timeout.Infinite);
+            return;
+        }
+        PostRefresh();
+    }
+
+    private void PostRefresh()
+    {
+        var threadId = Volatile.Read(ref _threadId);
+        if (threadId != 0 && Interlocked.Exchange(ref _refreshPosted, 1) == 0)
+            NativeMethods.PostThreadMessage(threadId, NativeMethods.WmAppRefreshExplorer, 0, 0);
+    }
+
+    private void PublishCapture()
+    {
+        ExplorerSnapshot snapshot;
+        try { snapshot = Capture(); }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"FolderGlimpse monitor recovered: {exception}");
+            snapshot = ExplorerSnapshot.Ineligible("Integration worker error", DateTimeOffset.UtcNow,
+                Interlocked.Increment(ref _generation));
+        }
+        Volatile.Write(ref _current, snapshot);
+        Volatile.Write(ref _invalidated, 0);
+        if (!DiagnosticsLog.Enabled) return;
+        var diagnostic = $"snapshot eligible={snapshot.IsEligible} reason={snapshot.Reason} hwnd=0x{snapshot.ForegroundWindow:X} focus=0x{snapshot.FocusWindow:X} path={snapshot.FolderPath ?? "<none>"}";
+        if (string.Equals(diagnostic, _lastDiagnostic, StringComparison.Ordinal)) return;
+        _lastDiagnostic = diagnostic;
+        DiagnosticsLog.Write(diagnostic);
     }
 
     private ExplorerSnapshot Capture()
@@ -67,8 +135,12 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
             using var process = Process.GetProcessById((int)pid);
             if (!string.Equals(process.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase))
             {
+                Volatile.Write(ref _currentExplorerWindow, 0);
+                Volatile.Write(ref _currentExplorerProcessId, 0);
                 return ExplorerSnapshot.Ineligible("Foreground is not Explorer", now, generation);
             }
+            Volatile.Write(ref _currentExplorerWindow, foreground);
+            Volatile.Write(ref _currentExplorerProcessId, (int)pid);
 
             if (_focusTask is { IsCompleted: false })
                 return ExplorerSnapshot.Ineligible("UI Automation worker is still busy", now, generation);
@@ -216,7 +288,9 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
     public void Dispose()
     {
         _stop.Cancel();
-        if (_thread.IsAlive) _thread.Join(500);
+        _eventDebounce.Dispose();
+        if (_threadId != 0) NativeMethods.PostThreadMessage(_threadId, NativeMethods.WmQuit, 0, 0);
+        if (_thread.IsAlive) _thread.Join(1000);
         _stop.Dispose();
     }
 
