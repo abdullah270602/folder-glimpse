@@ -84,6 +84,11 @@ public sealed class JsonSettingsService : ISettingsService
             Hotkey = document.Hotkey ?? defaults.Hotkey,
             HoldThresholdMs = document.HoldThresholdMs ?? defaults.HoldThresholdMs,
             TapBehavior = document.TapBehavior ?? defaults.TapBehavior,
+            HoverMode = document.HoverMode ?? defaults.HoverMode,
+            HoverOpenDelayMs = document.HoverOpenDelayMs ?? defaults.HoverOpenDelayMs,
+            HoverCloseDelayMs = document.HoverCloseDelayMs ?? defaults.HoverCloseDelayMs,
+            HoverMovementTolerancePx = document.HoverMovementTolerancePx ?? defaults.HoverMovementTolerancePx,
+            HoverModifier = document.HoverModifier ?? defaults.HoverModifier,
             InteractiveItems = document.InteractiveItems ?? defaults.InteractiveItems,
             DoubleClickFilesToOpen = document.DoubleClickFilesToOpen ?? defaults.DoubleClickFilesToOpen,
             DoubleClickFoldersToOpen = document.DoubleClickFoldersToOpen ?? defaults.DoubleClickFoldersToOpen,
@@ -143,6 +148,11 @@ public sealed class JsonSettingsService : ISettingsService
         public TriggerHotkey? Hotkey { get; set; }
         public int? HoldThresholdMs { get; set; }
         public TapBehavior? TapBehavior { get; set; }
+        public HoverPreviewMode? HoverMode { get; set; }
+        public int? HoverOpenDelayMs { get; set; }
+        public int? HoverCloseDelayMs { get; set; }
+        public int? HoverMovementTolerancePx { get; set; }
+        public HoverModifier? HoverModifier { get; set; }
         public bool? InteractiveItems { get; set; }
         public bool? DoubleClickFilesToOpen { get; set; }
         public bool? DoubleClickFoldersToOpen { get; set; }

@@ -17,6 +17,12 @@ public enum TriggerHotkey { Space, ControlSpace }
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TapBehavior { TogglePreview, MomentaryOnly }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum HoverPreviewMode { Off, SelectedFolder, AnyFolder }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum HoverModifier { None, Control, Shift }
+
 public sealed record FolderGlimpseSettings
 {
     public ThemePreference Theme { get; init; } = ThemePreference.System;
@@ -35,6 +41,11 @@ public sealed record FolderGlimpseSettings
     public TriggerHotkey Hotkey { get; init; } = TriggerHotkey.Space;
     public int HoldThresholdMs { get; init; } = 200;
     public TapBehavior TapBehavior { get; init; } = TapBehavior.TogglePreview;
+    public HoverPreviewMode HoverMode { get; init; } = HoverPreviewMode.Off;
+    public int HoverOpenDelayMs { get; init; } = 650;
+    public int HoverCloseDelayMs { get; init; } = 250;
+    public int HoverMovementTolerancePx { get; init; } = 6;
+    public HoverModifier HoverModifier { get; init; } = global::FolderGlimpse.Core.Settings.HoverModifier.None;
     public bool InteractiveItems { get; init; } = true;
     public bool DoubleClickFilesToOpen { get; init; } = true;
     public bool DoubleClickFoldersToOpen { get; init; } = true;
@@ -46,7 +57,11 @@ public sealed record FolderGlimpseSettings
     public bool ClosePreviewAfterOpening { get; init; } = true;
 
     [JsonIgnore] public TimeSpan HoldThreshold => TimeSpan.FromMilliseconds(HoldThresholdMs);
-    [JsonIgnore] public TimeSpan SnapshotMaxAge => TimeSpan.FromMilliseconds(350);
+    // WinEvents invalidate selection/focus snapshots immediately; a slow fallback refresh
+    // covers providers that omit events without forcing continuous cross-process polling.
+    [JsonIgnore] public TimeSpan SnapshotMaxAge => TimeSpan.FromMilliseconds(3500);
+    [JsonIgnore] public TimeSpan HoverOpenDelay => TimeSpan.FromMilliseconds(HoverOpenDelayMs);
+    [JsonIgnore] public TimeSpan HoverCloseDelay => TimeSpan.FromMilliseconds(HoverCloseDelayMs);
     [JsonIgnore] public int PreviewVisibleRows => 10;
     [JsonIgnore] public double PreviewRowHeightDip => Density == DisplayDensity.Compact ? 27 : 32;
 
@@ -66,6 +81,11 @@ public sealed record FolderGlimpseSettings
             Hotkey = Enum.IsDefined(Hotkey) ? Hotkey : TriggerHotkey.Space,
             HoldThresholdMs = Math.Clamp(HoldThresholdMs, 100, 600),
             TapBehavior = Enum.IsDefined(TapBehavior) ? TapBehavior : TapBehavior.TogglePreview,
+            HoverMode = Enum.IsDefined(HoverMode) ? HoverMode : HoverPreviewMode.Off,
+            HoverOpenDelayMs = Math.Clamp(HoverOpenDelayMs, 150, 2000),
+            HoverCloseDelayMs = Math.Clamp(HoverCloseDelayMs, 100, 1000),
+            HoverMovementTolerancePx = Math.Clamp(HoverMovementTolerancePx, 2, 16),
+            HoverModifier = Enum.IsDefined(HoverModifier) ? HoverModifier : global::FolderGlimpse.Core.Settings.HoverModifier.None,
             ConfirmBeforeOpeningMoreThan = Math.Clamp(ConfirmBeforeOpeningMoreThan, 2, 50)
         };
     }

@@ -1,5 +1,26 @@
 # Windows integration test checklist
 
+## Hover runtime verification — 2026-08-14
+
+The Release build was exercised against Windows 11 File Explorer in Details view, with
+diagnostics written to `artifacts/hover-runtime.log`:
+
+| Check | Result |
+|---|---|
+| Selected-folder mode after returning from visible Settings | Pass — App Certification Kit opened beside its selected row |
+| Any-folder mode on a selected row | Pass — Catalogs resolved through UIA + Shell and opened |
+| Any-folder mode on an unselected row | Pass — Remote remained selected while DesignTime was hovered and previewed |
+| Windows 11 read-only Details cells reported as UIA Edit | Pass after differentiating read-only cells from writable search/rename edits |
+| Exit grace | Pass — leaving source and preview closed after the configured 200 ms delay |
+| Blank Explorer area | Pass — one failed resolution, no popup, no repeated stationary work |
+| Settings wheel movement | Pass — controlled proportional scrolling rather than multi-card jumps |
+| Explorer selection refresh | Pass — WinEvent invalidation refreshed Catalogs → Remote without polling delay |
+| Explorer-foreground idle resource sample | Pass — 78.125 ms CPU over 12 seconds (0.651% of one core), 141.7 MB working set |
+
+Ctrl/Shift matching, dwell/tolerance boundaries, stale generations, persistence, and allocation
+behavior are covered by the automated suite. Physical modifier-hold behavior remains in the
+manual matrix below and should not be described as end-to-end verified until that check is run.
+
 ## Result from this development session
 
 Date: 2026-08-09  
@@ -100,6 +121,22 @@ folders and opens nothing automatically.
 - [ ] Open **Settings…** and exercise every control; restart and verify values persisted.
 - [ ] Change System/Light/Dark while the popup and Settings are open; verify immediate readable updates.
 - [ ] Test Space and exact Ctrl+Space modes, 100/600 ms hold limits, Toggle and Momentary Only.
+- [ ] Leave hover **Off** and verify ordinary pointer movement never opens a preview.
+- [ ] Select **Selected folder**, hover the selected row, and verify the preview opens only after
+      the configured delay. Hover an unselected folder and verify it stays closed.
+- [ ] Select **Any folder** and hover several unselected folders without clicking. Verify the
+      correct folder opens, fast pointer sweeps never flash stale previews, and A → B → C cannot
+      publish an old A/B result over C.
+- [ ] Exercise minimum/maximum open delay, exit delay, and movement tolerance. Move from the
+      Explorer row into the preview during exit grace and verify it remains open.
+- [ ] Test None, exact Ctrl, and exact Shift hover modifiers. Verify extra modifiers, mouse
+      buttons, drag/drop, Explorer menus, search, rename, navigation tree, desktop, and other
+      applications never open a hover preview.
+- [ ] While hover is open, press the configured keyboard trigger and verify keyboard ownership
+      cleanly replaces hover ownership. Open the FolderGlimpse shell and verify hover closes.
+- [ ] Compare Task Manager CPU with hover Off, Selected folder, and Any folder while idle and
+      during rapid movement. Disabled cost should match the existing build; enabled idle use
+      should remain negligible.
 - [ ] Verify 20/50/100/200/All limits, hidden-file filtering, all sort modes, folders-first,
       compact/comfortable density, path/size/date visibility, width, and height.
 - [ ] Toggle **Launch at startup** from both Settings and tray; verify synchronized state and

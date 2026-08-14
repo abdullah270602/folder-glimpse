@@ -101,6 +101,14 @@ and replace the previous file after exiting FolderGlimpse from the tray.
 3. Tap <kbd>Space</kbd> to keep a preview open, or hold it for a momentary preview.
 4. Tap <kbd>Space</kbd> again or press <kbd>Esc</kbd> to close a sticky preview.
 
+### Optional hover preview
+
+Hover preview is off by default. In **Settings → Hover preview**, choose **Selected
+folder** to hover only the current selection, or **Any folder** to preview a folder without
+selecting it first. The open delay, exit delay, movement tolerance, and optional Ctrl/Shift
+safety modifier are adjustable. The sampler is stopped entirely while hover is off; folder
+resolution starts only after the pointer remains stable for the configured delay.
+
 In an interactive sticky preview:
 
 - Click to select an item.

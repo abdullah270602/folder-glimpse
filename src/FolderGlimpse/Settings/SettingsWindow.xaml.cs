@@ -24,6 +24,8 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         SortBox.ItemsSource = new[] { new Choice<SortMode>("Name", SortMode.Name), new("Modified date", SortMode.ModifiedDate), new("File type", SortMode.Type) };
         HotkeyBox.ItemsSource = new[] { new Choice<TriggerHotkey>("Space", TriggerHotkey.Space), new("Ctrl + Space", TriggerHotkey.ControlSpace) };
         TapBox.ItemsSource = new[] { new Choice<TapBehavior>("Toggle preview", TapBehavior.TogglePreview), new("Momentary only", TapBehavior.MomentaryOnly) };
+        HoverModeBox.ItemsSource = new[] { new Choice<HoverPreviewMode>("Off", HoverPreviewMode.Off), new("Selected folder", HoverPreviewMode.SelectedFolder), new("Any folder", HoverPreviewMode.AnyFolder) };
+        HoverModifierBox.ItemsSource = new[] { new Choice<HoverModifier>("None", HoverModifier.None), new("Ctrl", HoverModifier.Control), new("Shift", HoverModifier.Shift) };
         LimitBox.ItemsSource = new[] { new Choice<int>("20 items", 20), new("50 items", 50), new("100 items", 100), new("200 items", 200), new("All items", 0) };
         Loaded += (_, _) => LoadValues();
         _settings.SettingsChanged += SettingsChanged;
@@ -64,6 +66,10 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         LimitBox.SelectedItem = FindChoice(LimitBox, s.InitialItemLimit);
         DensityBox.SelectedItem = FindChoice(DensityBox, s.Density); HotkeyBox.SelectedItem = FindChoice(HotkeyBox, s.Hotkey); HoldSlider.Value = s.HoldThresholdMs;
         TapBox.SelectedItem = FindChoice(TapBox, s.TapBehavior); StartupCheck.IsChecked = _startup.IsEnabled;
+        HoverModeBox.SelectedItem = FindChoice(HoverModeBox, s.HoverMode);
+        HoverModifierBox.SelectedItem = FindChoice(HoverModifierBox, s.HoverModifier);
+        HoverOpenSlider.Value = s.HoverOpenDelayMs; HoverCloseSlider.Value = s.HoverCloseDelayMs;
+        HoverToleranceSlider.Value = s.HoverMovementTolerancePx;
         InteractiveCheck.IsChecked = s.InteractiveItems; DoubleFileCheck.IsChecked = s.DoubleClickFilesToOpen;
         DoubleFolderCheck.IsChecked = s.DoubleClickFoldersToOpen; RightClickCheck.IsChecked = s.RightClickActions;
         MultiCheck.IsChecked = s.MultiSelection; SelectionCheckboxCheck.IsChecked = s.ShowSelectionCheckboxes;
@@ -91,6 +97,11 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
             Hotkey = (HotkeyBox.SelectedItem as Choice<TriggerHotkey>)?.Value ?? s.Hotkey,
             HoldThresholdMs = (int)HoldSlider.Value,
             TapBehavior = (TapBox.SelectedItem as Choice<TapBehavior>)?.Value ?? s.TapBehavior,
+            HoverMode = (HoverModeBox.SelectedItem as Choice<HoverPreviewMode>)?.Value ?? s.HoverMode,
+            HoverModifier = (HoverModifierBox.SelectedItem as Choice<HoverModifier>)?.Value ?? s.HoverModifier,
+            HoverOpenDelayMs = (int)HoverOpenSlider.Value,
+            HoverCloseDelayMs = (int)HoverCloseSlider.Value,
+            HoverMovementTolerancePx = (int)HoverToleranceSlider.Value,
             InteractiveItems = InteractiveCheck.IsChecked == true,
             DoubleClickFilesToOpen = DoubleFileCheck.IsChecked == true,
             DoubleClickFoldersToOpen = DoubleFolderCheck.IsChecked == true,
@@ -121,6 +132,9 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         WidthLabel.Text = $"{(int)WidthSlider.Value} px";
         HeightLabel.Text = $"{(int)HeightSlider.Value} px";
         HoldLabel.Text = $"{(int)HoldSlider.Value} ms";
+        HoverOpenLabel.Text = $"{(int)HoverOpenSlider.Value} ms";
+        HoverCloseLabel.Text = $"{(int)HoverCloseSlider.Value} ms";
+        HoverToleranceLabel.Text = $"{(int)HoverToleranceSlider.Value} px";
         ConfirmLabel.Text = $"{(int)ConfirmSlider.Value} items";
     }
 
@@ -132,6 +146,17 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         var multi = interactive && MultiCheck.IsChecked == true;
         CheckboxCard.IsEnabled = multi; AllowMultiCard.IsEnabled = multi;
         ConfirmCard.IsEnabled = multi && AllowMultiOpenCheck.IsChecked == true;
+        var hover = (HoverModeBox.SelectedItem as Choice<HoverPreviewMode>)?.Value is not HoverPreviewMode.Off;
+        HoverModifierCard.IsEnabled = hover; HoverOpenCard.IsEnabled = hover;
+        HoverCloseCard.IsEnabled = hover; HoverToleranceCard.IsEnabled = hover;
+    }
+
+    private void MainScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        // WPF's default wheel routing can jump several card rows at once. Keep navigation
+        // deliberate and predictable while still respecting high-resolution wheel deltas.
+        MainScrollViewer.ScrollToVerticalOffset(MainScrollViewer.VerticalOffset + SettingsScrollPolicy.OffsetDelta(e.Delta));
+        e.Handled = true;
     }
 
     private void ResetClicked(object sender, RoutedEventArgs e) { _settings.TryResetDefaults(out var error); ErrorText.Text = error ?? string.Empty; LoadValues(); }

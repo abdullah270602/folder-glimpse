@@ -16,6 +16,9 @@ internal static class NativeMethods
     internal const int VkMenu = 0x12;
     internal const int VkLWin = 0x5B;
     internal const int VkRWin = 0x5C;
+    internal const int VkLButton = 0x01;
+    internal const int VkRButton = 0x02;
+    internal const int VkMButton = 0x04;
     internal const uint LlkhfInjected = 0x10;
     internal const int GwlExStyle = -20;
     internal const long WsExToolWindow = 0x00000080L;
@@ -28,6 +31,14 @@ internal static class NativeMethods
     internal const int DwmwaWindowCornerPreference = 33;
     internal const int DwmwaUseImmersiveDarkMode = 20;
     internal const int DwmwcpRoundSmall = 3;
+    internal const uint WmQuit = 0x0012;
+    internal const uint WmAppRefreshExplorer = 0x8001;
+    internal const uint EventSystemForeground = 0x0003;
+    internal const uint EventObjectFocus = 0x8005;
+    internal const uint EventObjectSelectionWithin = 0x8009;
+    internal const uint EventObjectLocationChange = 0x800B;
+    internal const uint WineventOutOfContext = 0x0000;
+    internal const uint WineventSkipOwnProcess = 0x0002;
 
     internal static readonly nint HwndTopmost = new(-1);
     internal static readonly nint HwndNotTopmost = new(-2);
@@ -84,6 +95,8 @@ internal static class NativeMethods
     }
 
     internal delegate nint LowLevelKeyboardProc(int code, nint wParam, nint lParam);
+    internal delegate void WinEventProc(nint hook, uint eventType, nint window, int objectId, int childId,
+        uint eventThread, uint eventTime);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint module, uint threadId);
@@ -101,6 +114,14 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern bool PostThreadMessage(uint threadId, uint message, nint wParam, nint lParam);
 
+    [DllImport("user32.dll")]
+    internal static extern nint SetWinEventHook(uint eventMin, uint eventMax, nint module, WinEventProc callback,
+        uint processId, uint threadId, uint flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UnhookWinEvent(nint hook);
+
     [DllImport("kernel32.dll")]
     internal static extern uint GetCurrentThreadId();
 
@@ -116,6 +137,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(nint window, out Rect rect);
 
     [DllImport("user32.dll")]
     internal static extern uint GetWindowThreadProcessId(nint window, out uint processId);
