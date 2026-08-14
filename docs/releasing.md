@@ -9,16 +9,16 @@ described in [signing.md](signing.md). The repository is licensed under the MIT 
 ## Version policy
 
 - Stable: `vMAJOR.MINOR.PATCH`, for example `v1.0.0`.
-- Prerelease: `vMAJOR.MINOR.PATCH-beta.N`, for example `v1.0.0-beta.1`.
+- Prerelease: `vMAJOR.MINOR.PATCH-beta.N`, for example `v0.1.0-beta.1`.
 - Release tags are annotated and maintainer-signed.
 - The workflow derives assembly, file, informational, and asset versions from the tag.
 - The About page continues to read assembly metadata; it must not hardcode a release number.
 - `CHANGELOG.md` is updated before tagging. GitHub-generated notes supplement rather than replace
   important compatibility, security, and migration notes.
 
-Because FolderGlimpse has not yet had a public, signed release, `v0.1.0` or
-`v1.0.0-beta.1` is the recommended first public test version. The owner must choose; this repository
-preparation does not create or assign a tag.
+Because FolderGlimpse has not yet had a public, signed release, `v0.1.0-beta.1` is the selected
+first public test version. A release tag is created only after the production-signing and QA gates
+below pass.
 
 ## 1. Prepare
 
@@ -39,10 +39,11 @@ dotnet restore FolderGlimpse.sln --configfile NuGet.config
 dotnet build FolderGlimpse.sln -c Debug --no-restore
 dotnet build FolderGlimpse.sln -c Release --no-restore
 dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release --no-build
+dotnet run --project tests/FolderGlimpse.UiTests/FolderGlimpse.UiTests.csproj -c Release --no-build
 ```
 
 Run a safe unsigned packaging rehearsal through GitHub Actions using **Release → Run workflow**.
-Supply a prerelease-shaped version such as `1.0.0-dryrun.1`. This path builds artifacts but cannot
+Supply a prerelease-shaped version such as `0.1.0-dryrun.1`. This path builds artifacts but cannot
 access signing credentials or publish a GitHub Release.
 
 ## 3. Create the release tag
@@ -50,15 +51,15 @@ access signing credentials or publish a GitHub Release.
 After committing the reviewed release preparation, create a signed annotated tag locally:
 
 ```powershell
-git tag -s v1.0.0 -m "FolderGlimpse v1.0.0"
-git tag -v v1.0.0
+git tag -s v0.1.0-beta.1 -m "FolderGlimpse v0.1.0-beta.1"
+git tag -v v0.1.0-beta.1
 ```
 
 Pushing is an explicit owner action:
 
 ```powershell
 git push origin main
-git push origin v1.0.0
+git push origin v0.1.0-beta.1
 ```
 
 The workflow rejects malformed and lightweight tags and ensures the tag resolves to its workflow

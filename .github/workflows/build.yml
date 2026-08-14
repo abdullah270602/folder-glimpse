@@ -41,6 +41,9 @@ jobs:
       - name: Run tests
         run: dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release --no-build
 
+      - name: Run WPF interaction tests
+        run: dotnet run --project tests/FolderGlimpse.UiTests/FolderGlimpse.UiTests.csproj -c Release --no-build
+
       - name: Publish unsigned smoke-test build
         run: >-
           dotnet publish src/FolderGlimpse/FolderGlimpse.csproj

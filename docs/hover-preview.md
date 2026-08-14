@@ -16,8 +16,10 @@ it. Hover ships disabled until the user explicitly chooses one of two targeting 
 2. The pointer must remain within the configured movement tolerance for the configured dwell time.
 3. FolderGlimpse appears beside the item without activating or changing Explorer selection.
 4. The preview stays open while the pointer is over the source item or the preview.
-5. It closes after the configured exit delay when the pointer leaves both regions.
-6. Moving to another folder starts a new dwell; the old preview cannot publish over the new target.
+5. Double-clicking a child item opens it through the normal Windows shell without activating the
+   glimpse for keyboard input. Selection, keyboard navigation, and context actions remain sticky-only.
+6. It closes after the configured exit delay when the pointer leaves both regions.
+7. Moving to another folder starts a new dwell; the old preview cannot publish over the new target.
 
 Settings are independent and persistent:
 
@@ -81,6 +83,15 @@ Performance budgets for Release builds:
 - existing cancellable background folder inspection and icon cache behavior remain unchanged;
 - idle hover-disabled cost is zero (timer stopped and worker asleep).
 
+## Pointer interaction
+
+Hover and sticky previews use separate interaction modes. Hover enables hit-testing only for row
+double-click activation and retains `WS_EX_NOACTIVATE`; it never selects rows, accepts keyboard
+input, shows selection checkboxes, or opens context menus. A double-click passes the exact row entry
+to the shared activation service, closes the hover glimpse after a successful request, and preserves
+the file/folder activation settings. Momentary previews remain fully view-only. Sticky previews keep
+the complete selection, keyboard, Open button, and context-action behavior.
+
 ## State model
 
 `Idle -> Dwelling -> Resolving -> Open -> ClosingGrace -> Idle`
@@ -104,6 +115,8 @@ the pointer rests on a file, blank area, or unsupported Explorer surface.
 - stale completion, rapid A→B→C movement, same-target cache, and duplicate-open suppression;
 - leave/return close grace, pointer over preview, foreground loss, drag/buttons, modifiers, disable,
   settings change, keyboard preemption, and Explorer restart;
+- interaction-mode truth table covering view-only, hover-pointer, and sticky behavior; hover
+  double-click routing for files/folders; disabled activation settings; missing targets and failures;
 - sampler benchmark with fake Win32 input proving no deferred calls before dwell;
 - real Windows matrix across Explorer layouts, tabs, search/rename/navigation tree, mixed DPI,
   100/125/150/200%, negative monitor origins, scrolling, and large folders.

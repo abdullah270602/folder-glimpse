@@ -117,8 +117,9 @@ configured <kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> shortcut to keep
 or hold it for a momentary look. Tap the shortcut again or press <kbd>Esc</kbd> to close a sticky
 glimpse. The shortcut and tap/hold behavior can be changed in Settings.
 
-Hover glimpses are view-only so they never take focus from Explorer. Tap the keyboard trigger when
-you want an interactive sticky glimpse with selection and opening controls.
+Hover glimpses stay non-activating so they never take keyboard focus from Explorer, but you can
+double-click an item to open it. Tap the keyboard trigger when you want a fully interactive sticky
+glimpse with selection, keyboard navigation, context actions, and opening controls.
 
 In an interactive sticky preview:
 
@@ -151,7 +152,8 @@ Settings and application state are stored locally under `%LOCALAPPDATA%\FolderGl
   locations are intentionally not supported yet.
 - Elevated Explorer windows may not be accessible to a normally launched FolderGlimpse;
   the shortcut passes through safely in that case.
-- Momentary previews are view-only. Sticky previews support selection and activation.
+- Momentary previews are view-only. Hover previews support pointer double-click activation, while
+  sticky previews add selection, keyboard navigation, and context actions.
 - High contrast does not yet have a dedicated visual theme.
 
 ## Build from source
@@ -168,6 +170,7 @@ cd folder-glimpse
 dotnet restore FolderGlimpse.sln --configfile NuGet.config
 dotnet build FolderGlimpse.sln -c Release
 dotnet run --project tests/FolderGlimpse.Tests/FolderGlimpse.Tests.csproj -c Release
+dotnet run --project tests/FolderGlimpse.UiTests/FolderGlimpse.UiTests.csproj -c Release
 ```
 
 Create the same self-contained single-file build used for releases:

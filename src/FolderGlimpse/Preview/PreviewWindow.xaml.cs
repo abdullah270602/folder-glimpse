@@ -21,7 +21,7 @@ public partial class PreviewWindow : Window
     private readonly IShellLauncher _launcher;
     private FolderGlimpseSettings _settings = FolderGlimpseSettings.Default;
     private nint _handle;
-    private bool _stickyInteractive;
+    private PreviewInteractionMode _interactionMode;
     private ContextMenu? _entryMenu;
     private PixelRect _lastAnchor;
     private bool _detached;
@@ -89,20 +89,24 @@ public partial class PreviewWindow : Window
         UpdateLayout();
     }
 
-    internal void ConfigureInteraction(bool sticky, FolderGlimpseSettings settings)
+    internal void ConfigureInteraction(PreviewInteractionMode mode, FolderGlimpseSettings settings)
     {
         _settings = settings;
-        _stickyInteractive = sticky && settings.InteractiveItems;
-        ViewModel.ShowCheckboxes = _stickyInteractive && settings.MultiSelection && settings.ShowSelectionCheckboxes;
-        EntryList.IsHitTestVisible = _stickyInteractive;
-        EntryList.Focusable = _stickyInteractive;
+        _interactionMode = settings.InteractiveItems ? mode : PreviewInteractionMode.ViewOnly;
+        var selectable = ItemActionPolicy.CanSelect(_interactionMode, settings);
+        ViewModel.ShowCheckboxes = selectable && settings.MultiSelection && settings.ShowSelectionCheckboxes;
+        EntryList.IsHitTestVisible = ItemActionPolicy.CanHitTestEntries(_interactionMode, settings);
+        EntryList.Focusable = selectable;
+        EntryList.Cursor = _interactionMode == PreviewInteractionMode.HoverPointer
+            ? System.Windows.Input.Cursors.Hand
+            : System.Windows.Input.Cursors.Arrow;
         var needsSelectionRefresh = _selection.SelectedCount > 0;
-        if (!_stickyInteractive) _selection.Clear();
+        if (!selectable) _selection.Clear();
         else if (!settings.MultiSelection && _selection.SelectedIndices.Count > 1)
             _selection.Select(_selection.FocusedIndex ?? _selection.SelectedIndices.Min(), ViewModel.Entries.Count, multiSelection: false);
         if (needsSelectionRefresh) RefreshSelection();
         else ViewModel.SelectedCount = 0;
-        SetInteractiveStyle(_stickyInteractive);
+        SetInteractiveStyle(selectable);
     }
 
     internal void SetDetached(bool detached)
@@ -127,11 +131,12 @@ public partial class PreviewWindow : Window
         encoder.Save(stream);
     }
 
-    internal void ShowBeside(PixelRect anchor, FolderGlimpseSettings settings, bool sticky = false)
+    internal void ShowBeside(PixelRect anchor, FolderGlimpseSettings settings,
+        PreviewInteractionMode interactionMode = PreviewInteractionMode.ViewOnly)
     {
         _lastAnchor = anchor;
         SetDetached(false);
-        ConfigureInteraction(sticky, settings);
+        ConfigureInteraction(interactionMode, settings);
         Width = settings.PopupWidth;
         MaxHeight = settings.MaxPopupHeight;
         EntryList.Tag = settings.PreviewRowHeightDip;
@@ -157,9 +162,10 @@ public partial class PreviewWindow : Window
         var popupSize = new PixelSize((int)Math.Ceiling(Width * dpi / 96d), (int)Math.Ceiling(Height * dpi / 96d));
         var work = new PixelRect(info.Work.Left, info.Work.Top, info.Work.Right, info.Work.Bottom);
         var placed = PopupPositioner.Place(_lastAnchor, work, popupSize);
-        var flags = NativeMethods.SwpShowWindow | (_stickyInteractive ? 0u : NativeMethods.SwpNoActivate);
+        var stickyInteractive = ItemActionPolicy.CanSelect(_interactionMode, _settings);
+        var flags = NativeMethods.SwpShowWindow | (stickyInteractive ? 0u : NativeMethods.SwpNoActivate);
         NativeMethods.SetWindowPos(_handle, _detached ? NativeMethods.HwndNotTopmost : NativeMethods.HwndTopmost, placed.Left, placed.Top, placed.Width, placed.Height, flags);
-        if (_stickyInteractive)
+        if (stickyInteractive)
         {
             ActivateForInteraction();
             EntryList.Focus();
@@ -195,27 +201,44 @@ public partial class PreviewWindow : Window
 
     private void EntryListMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!_stickyInteractive) return;
+        if (!ItemActionPolicy.CanHitTestEntries(_interactionMode, _settings)) return;
         if (FindRow(e.OriginalSource as DependencyObject) is not { } row)
         {
-            _selection.Clear();
-            RefreshSelection();
+            if (ItemActionPolicy.CanSelect(_interactionMode, _settings))
+            {
+                _selection.Clear();
+                RefreshSelection();
+            }
             return;
         }
-        if (FindAncestor<System.Windows.Controls.CheckBox>(e.OriginalSource as DependencyObject) is not null) return;
         var index = EntryList.ItemContainerGenerator.IndexFromContainer(row);
+        if (index < 0 || index >= ViewModel.Entries.Count) return;
+        var entry = ViewModel.Entries[index].Entry;
+        if (DiagnosticsLog.Enabled)
+            DiagnosticsLog.Write($"preview pointer mode={_interactionMode} clicks={e.ClickCount} entry={entry.FullPath}");
+        if (_interactionMode == PreviewInteractionMode.HoverPointer)
+        {
+            if (e.ClickCount == 2 &&
+                ItemActionPolicy.ActivationTargetsForDoubleClick(_interactionMode, entry, _settings) is { Count: > 0 } targets)
+                _ = RequestOpenAsync(targets);
+            e.Handled = true;
+            return;
+        }
+        if (!ItemActionPolicy.CanSelect(_interactionMode, _settings) ||
+            FindAncestor<System.Windows.Controls.CheckBox>(e.OriginalSource as DependencyObject) is not null) return;
         var modifiers = Keyboard.Modifiers;
         _selection.Select(index, ViewModel.Entries.Count, modifiers.HasFlag(ModifierKeys.Control), modifiers.HasFlag(ModifierKeys.Shift), _settings.MultiSelection);
         RefreshSelection(index);
-        if (e.ClickCount == 2 && index >= 0 && index < ViewModel.Entries.Count &&
-            ItemActionPolicy.CanDoubleClick(ViewModel.Entries[index].Entry, _settings))
+        if (e.ClickCount == 2 &&
+            ItemActionPolicy.ActivationTargetsForDoubleClick(_interactionMode, entry, _settings).Count > 0)
             _ = RequestOpenAsync();
         e.Handled = true;
     }
 
     private void EntryListMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!_stickyInteractive || !_settings.RightClickActions || FindRow(e.OriginalSource as DependencyObject) is not { } row) return;
+        if (!ItemActionPolicy.CanUseContextActions(_interactionMode, _settings) ||
+            FindRow(e.OriginalSource as DependencyObject) is not { } row) return;
         var index = EntryList.ItemContainerGenerator.IndexFromContainer(row);
         if (!_selection.IsSelected(index)) _selection.Select(index, ViewModel.Entries.Count, multiSelection: _settings.MultiSelection);
         RefreshSelection(index);
@@ -225,7 +248,8 @@ public partial class PreviewWindow : Window
 
     private void SelectionCheckboxClicked(object sender, RoutedEventArgs e)
     {
-        if (!_stickyInteractive || sender is not System.Windows.Controls.CheckBox check || check.DataContext is not PreviewEntryViewModel item) return;
+        if (!ItemActionPolicy.CanSelect(_interactionMode, _settings) || sender is not System.Windows.Controls.CheckBox check ||
+            check.DataContext is not PreviewEntryViewModel item) return;
         var index = ViewModel.Entries.IndexOf(item);
         _selection.Toggle(index, ViewModel.Entries.Count, _settings.MultiSelection);
         RefreshSelection(index);
@@ -234,7 +258,7 @@ public partial class PreviewWindow : Window
 
     private void WindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (!_stickyInteractive) return;
+        if (!ItemActionPolicy.CanSelect(_interactionMode, _settings)) return;
         if (e.Key is Key.Up or Key.Down)
         {
             var index = _selection.Move(e.Key == Key.Down ? 1 : -1, ViewModel.Entries.Count);
@@ -253,9 +277,9 @@ public partial class PreviewWindow : Window
 
     private async void OpenSelectedClicked(object sender, RoutedEventArgs e) => await RequestOpenAsync();
 
-    private Task RequestOpenAsync()
+    private Task RequestOpenAsync(IReadOnlyList<FolderEntry>? entries = null)
     {
-        var selected = SelectedEntries();
+        var selected = entries ?? SelectedEntries();
         return selected.Count == 0 || OpenRequested is null ? Task.CompletedTask : OpenRequested.Invoke(selected);
     }
 
