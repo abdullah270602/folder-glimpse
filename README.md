@@ -1,8 +1,8 @@
 <div align="center">
   <img src="src/FolderGlimpse/Assets/Branding/FolderGlimpse-App-128.png" width="96" alt="FolderGlimpse icon">
   <h1>FolderGlimpse</h1>
-  <p><strong>Glance inside folders without opening them.</strong></p>
-  <p>A fast, lightweight folder preview utility built for Windows 11.</p>
+  <p><strong>Hover over a folder. See what's inside.</strong></p>
+  <p>A fast, lightweight File Explorer companion for Windows 11.</p>
 
   [![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)](https://www.microsoft.com/windows/windows-11)
   [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -22,16 +22,18 @@
 > active after the first reviewed, Authenticode-signed GitHub Release. Until then, build from
 > source for evaluation and do not redistribute local validation artifacts.
 
-FolderGlimpse lets you inspect a folder directly from File Explorer without navigating
-into it. Select a folder and press <kbd>Space</kbd>: tap to keep the preview open, or hold
-to view it only while the key is pressed.
+FolderGlimpse shows a compact preview when you rest the pointer over a folder in File
+Explorer—without opening it or leaving the folder you are viewing. Choose any-folder hover,
+selected-folder hover, or an optional Ctrl/Shift hover modifier. Prefer the keyboard? Configure
+<kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> with tap and hold behavior.
 
 ![FolderGlimpse folder preview](docs/preview.svg)
 
 ## Highlights
 
-- **Instant folder previews** from Windows 11 File Explorer
-- **Tap or hold** the configured shortcut for sticky or momentary previews
+- **Hover to glimpse** folders directly from Windows 11 File Explorer
+- **Flexible trigger options** with any-folder hover, selected-only hover, and modifiers
+- **Configurable keyboard access** using Space or Ctrl+Space with tap and hold behavior
 - **Open files and folders** directly from an interactive sticky preview
 - **Multi-select and context actions** with familiar Windows interactions
 - **System, light, and dark themes** with mixed-DPI monitor support
@@ -96,18 +98,27 @@ and replace the previous file after exiting FolderGlimpse from the tray.
 
 ## How to use
 
-1. Open Windows 11 File Explorer.
-2. Select exactly one normal local folder in the file list.
-3. Tap <kbd>Space</kbd> to keep a preview open, or hold it for a momentary preview.
-4. Tap <kbd>Space</kbd> again or press <kbd>Esc</kbd> to close a sticky preview.
+### Hover to glimpse
 
-### Optional hover preview
+1. Open **Settings → Hover preview** once and choose **Any folder**.
+2. Rest the pointer over a normal local folder in Windows 11 File Explorer.
+3. After the configured delay, the glimpse appears without changing your selection.
+4. Move into the glimpse to keep it visible while reading; move away to dismiss it.
 
-Hover preview is off by default. In **Settings → Hover preview**, choose **Selected
-folder** to hover only the current selection, or **Any folder** to preview a folder without
-selecting it first. The open delay, exit delay, movement tolerance, and optional Ctrl/Shift
-safety modifier are adjustable. The sampler is stopped entirely while hover is off; folder
-resolution starts only after the pointer remains stable for the configured delay.
+Choose **Selected folder** if you only want hover to work on the current selection. You can
+also require <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while hovering, and adjust the open delay,
+exit grace, and movement tolerance. Hover is opt-in: it remains completely off until you choose
+a hover mode.
+
+### Keyboard trigger
+
+Keyboard access remains available alongside hover. Select one normal local folder, then tap the
+configured <kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> shortcut to keep a glimpse open,
+or hold it for a momentary look. Tap the shortcut again or press <kbd>Esc</kbd> to close a sticky
+glimpse. The shortcut and tap/hold behavior can be changed in Settings.
+
+Hover glimpses are view-only so they never take focus from Explorer. Tap the keyboard trigger when
+you want an interactive sticky glimpse with selection and opening controls.
 
 In an interactive sticky preview:
 
@@ -125,9 +136,10 @@ the notification area. The tray menu provides **Open FolderGlimpse**, **Enabled*
 ## Safety and privacy
 
 FolderGlimpse works offline, requires no administrator privileges, performs no telemetry,
-and does not modify previewed folders. It uses conservative Explorer and UI Automation
-checks and passes the shortcut through whenever the current context cannot be proven safe—for
-example, while typing in search, the address bar, or a rename field.
+and does not modify previewed folders. Its hover and keyboard triggers use conservative Explorer
+and UI Automation checks. Uncertain hover targets are ignored, and keyboard input passes through
+whenever the context cannot be proven safe—for example, while typing in search, the address bar,
+or a rename field.
 
 Settings and application state are stored locally under `%LOCALAPPDATA%\FolderGlimpse`.
 
