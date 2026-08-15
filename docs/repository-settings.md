@@ -34,6 +34,8 @@ maintenance dependent on bypassing checks.
 
 - Add a ruleset for `v*` tags restricting creation, update, and deletion to release maintainers.
 - Require signed annotated tags as a maintainer practice.
+- Treat numbered beta/RC tags as the only unsigned public-release namespace; stable tags always use
+  the trusted signing environment.
 - Create an Environment named exactly `production-signing`.
 - Add a required reviewer who checks commit, tag, test results, artifact origin, and provider request.
 - Restrict deployment branches/tags to the protected semantic-version tag pattern.
@@ -60,5 +62,6 @@ dependency review on pull requests and weekly CodeQL analysis.
 ## Publishing policy
 
 Treat releases as immutable. Do not replace an asset under an existing version or reuse a tag. Keep
-GitHub Releases as the initial canonical host, verify the uploaded hash/signature on a clean Windows
-system, and only then update external download pages or WinGet manifests.
+GitHub Releases as the initial canonical host, verify the uploaded hash and attestation—and the
+Authenticode signature for stable releases—on a clean Windows system before updating external
+download pages or WinGet manifests.

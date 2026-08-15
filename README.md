@@ -10,7 +10,7 @@
 
   <br>
 
-  **[Download FolderGlimpse for Windows](https://github.com/abdullah270602/folder-glimpse/releases/latest/download/FolderGlimpse.exe)**
+  **[Download the latest FolderGlimpse beta](https://github.com/abdullah270602/folder-glimpse/releases)**
   · [View releases](https://github.com/abdullah270602/folder-glimpse/releases)
   · [Report an issue](https://github.com/abdullah270602/folder-glimpse/issues)
 </div>
@@ -18,9 +18,11 @@
 ---
 
 > [!IMPORTANT]
-> No official FolderGlimpse binary has been published yet. The download links above will become
-> active after the first reviewed, Authenticode-signed GitHub Release. Until then, build from
-> source for evaluation and do not redistribute local validation artifacts.
+> The current public beta channel is intentionally **unsigned** while FolderGlimpse awaits approval
+> for trusted open-source signing. Windows SmartScreen may show an unrecognized-app warning.
+> Download only from this repository's [Releases](https://github.com/abdullah270602/folder-glimpse/releases),
+> verify the checksum or GitHub attestation, and never disable SmartScreen or install a root
+> certificate for FolderGlimpse.
 
 FolderGlimpse shows a compact preview when you rest the pointer over a folder in File
 Explorer—without opening it or leaving the folder you are viewing. Choose any-folder hover,
@@ -53,23 +55,30 @@ Official release builds will not require a separate .NET installation.
 4. Optionally enable **Launch at startup** in Settings or from the tray menu.
 
 > [!NOTE]
-> FolderGlimpse is not code-signed yet. Windows SmartScreen may show an
-> “unrecognized app” message on first launch. Download only from this repository's
-> official [Releases](https://github.com/abdullah270602/folder-glimpse/releases) page.
-
-For private testing before the first official release, the entire self-contained build folder
-may be zipped and shared. Recipients should extract it before running the EXE and understand that
-the build is unsigned. Do not present a locally shared build as an official GitHub release.
+> Public beta builds are not Authenticode-signed yet. Windows SmartScreen may show an
+> “unrecognized app” message on first launch. A self-signed certificate would not establish public
+> Windows trust, so beta releases remain transparently unsigned until trusted signing is available.
 
 ### Verify a download
 
-Each production release will include `SHA256SUMS.txt`. From the folder containing the
+Each public release includes `SHA256SUMS.txt`. From the folder containing the
 download, compare the published hash with the locally calculated value:
 
 ```powershell
 Get-FileHash .\FolderGlimpse.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
+
+GitHub also records build provenance for the final EXE and ZIP. With GitHub CLI installed:
+
+```powershell
+gh attestation verify .\FolderGlimpse.exe --repo abdullah270602/folder-glimpse
+gh attestation verify .\FolderGlimpse-win-x64.zip --repo abdullah270602/folder-glimpse
+```
+
+Checksums and attestations prove integrity and build origin; they do not create a Windows-trusted
+publisher identity. The release page will explicitly say when trusted Authenticode signing becomes
+available.
 
 Once production signing is enabled, verify both the publisher signature and timestamp:
 

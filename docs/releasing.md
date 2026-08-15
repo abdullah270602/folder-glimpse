@@ -1,10 +1,11 @@
 # Maintainer release runbook
 
-GitHub Releases is the canonical FolderGlimpse binary source. Production release assets are the
-signed portable EXE, ZIP, SHA-256 checksum list, SPDX SBOM, and GitHub provenance attestations.
+GitHub Releases is the canonical FolderGlimpse binary source. Every public release includes the
+portable EXE, ZIP, SHA-256 checksum list, SPDX SBOM, and GitHub provenance attestations.
 
-No production release may proceed until a real production signing service is configured as
-described in [signing.md](signing.md). The repository is licensed under the MIT License.
+Until trusted signing is approved, only explicitly labeled `beta.N` or `rc.N` prereleases may be
+published unsigned. Stable releases remain blocked until a real production signing service is
+configured as described in [signing.md](signing.md). The repository is licensed under the MIT License.
 
 ## Version policy
 
@@ -17,16 +18,16 @@ described in [signing.md](signing.md). The repository is licensed under the MIT 
   important compatibility, security, and migration notes.
 
 Because FolderGlimpse has not yet had a public, signed release, `v0.1.0-beta.1` is the selected
-first public test version. A release tag is created only after the production-signing and QA gates
-below pass.
+first public test version. It is an unsigned beta with checksums, SBOM, provenance, malware scan,
+and launch validation—not a trusted production release.
 
 ## 1. Prepare
 
 1. Confirm `git status --short` contains only intended changes.
 2. Confirm the repository-local identity is `Abdullah Naseem <abdullahnaseem27@gmail.com>`.
 3. Move the relevant `CHANGELOG.md` entries out of Unreleased.
-4. Before the first release, replace the README's “no official binary” and “not code-signed yet”
-   notices with the verified publisher/signature state. Never update those claims speculatively.
+4. Confirm the README accurately identifies the current channel as unsigned beta or trusted stable.
+   Never claim a verified publisher until the shipped artifact has been independently checked.
 5. Review privacy, security, compatibility, and uninstall documentation.
 6. Review dependency and CodeQL alerts.
 7. Complete every applicable item in [manual-testing.md](manual-testing.md), especially physical
@@ -65,7 +66,17 @@ git push origin v0.1.0-beta.1
 The workflow rejects malformed and lightweight tags and ensures the tag resolves to its workflow
 commit. Protect the tag namespace so only maintainers can create or delete release tags.
 
-## 4. Approve signing and observe the pipeline
+## 4. Observe the selected release channel
+
+For an unsigned beta:
+
+1. Confirm the build/test candidate and unsigned-beta policy gate are green.
+2. Confirm Microsoft Defender/basic scanning completed or review any explicit runner warning.
+3. Confirm the ZIP extraction and launch smoke test passed.
+4. Confirm checksums, SBOM, and provenance attestations target the final published bytes.
+5. Confirm the GitHub Release is marked **Prerelease** and its title and notes say **unsigned beta**.
+
+For a stable release, trusted signing is mandatory:
 
 1. Confirm the build/test candidate job is green.
 2. Review the exact commit, tag, unsigned candidate hash, and workflow initiator.
@@ -77,8 +88,9 @@ commit. Protect the tag namespace so only maintainers can create or delete relea
 8. Confirm checksums were calculated only after signing and ZIP creation.
 9. Confirm SBOM and provenance attestations target the released hashes.
 
-The workflow fails closed and creates no release when licensing, signing, signature verification,
-timestamping, packaging, or validation fails.
+The workflow fails closed when the selected channel violates policy: an unsigned tag that is not a
+numbered beta/RC cannot publish, and a stable tag cannot publish without trusted signing,
+timestamping, packaging, and validation.
 
 ## 5. Verify the published release
 
@@ -89,9 +101,19 @@ Get-FileHash .\FolderGlimpse.exe -Algorithm SHA256
 Get-FileHash .\FolderGlimpse-win-x64.zip -Algorithm SHA256
 Get-FileHash .\FolderGlimpse.spdx.json -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
+gh attestation verify .\FolderGlimpse.exe --repo abdullah270602/folder-glimpse
+gh attestation verify .\FolderGlimpse-win-x64.zip --repo abdullah270602/folder-glimpse
+```
+
+For a trusted stable release, additionally run:
+
+```powershell
 Get-AuthenticodeSignature .\FolderGlimpse.exe | Format-List *
 signtool verify /pa /all /v .\FolderGlimpse.exe
 ```
+
+For an unsigned beta, confirm `Get-AuthenticodeSignature` reports `NotSigned` and that the release
+notes disclose this. A beta signature must never be implied by checksums or GitHub attestations.
 
 Extract the ZIP, confirm its EXE hash equals the standalone EXE, launch it, complete onboarding,
 preview the test folders, enable/disable startup, exit, relaunch, and uninstall using the README
@@ -107,7 +129,7 @@ Do not replace binaries inside an existing release. If a release is defective:
 
 1. Mark it clearly as affected and stop recommending it.
 2. Disable or remove the release only when necessary to protect users; retain incident evidence.
-3. Fix forward with a new semantic version, rebuilt and signed through the complete pipeline.
+3. Fix forward with a new semantic version, rebuilt through the complete channel-specific pipeline.
 4. Revoke a signing certificate only for actual key/identity compromise, following the CA or
    signing-provider process.
 5. Publish a security advisory when confidentiality allows.

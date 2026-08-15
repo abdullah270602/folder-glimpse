@@ -2,10 +2,23 @@
 
 ## Purpose and scope
 
-Code signing identifies official FolderGlimpse Windows release artifacts and protects their
-integrity. This policy covers public production executables and packages distributed through the
-canonical GitHub Releases page. Pull-request, branch, local, and dry-run builds remain unsigned and
-must not be represented as official downloads.
+Code signing identifies trusted FolderGlimpse Windows release artifacts and protects their
+integrity. This policy covers stable executables and packages distributed through the canonical
+GitHub Releases page. Pull-request, branch, local, and dry-run builds remain unsigned. Until trusted
+signing is approved, explicitly labeled `beta.N` or `rc.N` prereleases may also be published
+unsigned under the separate controls below.
+
+## Temporary unsigned prerelease channel
+
+An unsigned prerelease is an official test build, but it is not a trusted production build. It may
+be published only from an annotated semantic-version tag already contained in `main`, after build,
+test, metadata, malware-scan, packaging, extraction, and launch checks pass. The workflow publishes
+SHA-256 checksums, an SPDX SBOM, and GitHub provenance attestations for the final EXE and ZIP.
+
+The README and release notes must say that the beta is unsigned and may trigger SmartScreen. They
+must direct users to canonical GitHub Releases and must never ask users to disable SmartScreen,
+ignore security warnings, or install a self-signed root certificate. Stable tags remain fail-closed
+until the trusted signing configuration and approvals below are available.
 
 ## Authorized releases
 

@@ -24,7 +24,8 @@ foreach ($relativePath in $requiredRepositoryFiles) {
 
 $readme = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw
 if ($readme -match 'No official FolderGlimpse binary has been published yet' -or
-    $readme -match 'FolderGlimpse is not code-signed yet') {
+    $readme -match 'FolderGlimpse is not code-signed yet' -or
+    $readme -match '(?is)(?:unsigned.{0,80}(?:public\s+)?beta|(?:public\s+)?beta.{0,80}unsigned)') {
     throw 'README release/signing notices must be updated with verified production facts before the first release.'
 }
 
