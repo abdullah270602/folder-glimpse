@@ -5,6 +5,8 @@ All notable FolderGlimpse changes will be documented here. The project follows
 
 ## Unreleased
 
+## [0.1.0-beta.1] - 2026-08-15
+
 ### Added
 
 - Configurable hover-to-glimpse modes for the selected folder or any folder under the pointer,
@@ -37,5 +39,6 @@ All notable FolderGlimpse changes will be documented here. The project follows
 - Hover glimpses now accept file and folder double-clicks without taking keyboard focus; momentary
   previews remain view-only and sticky previews retain full selection and context actions.
 
-These unreleased changes are targeting the first public test build, `v0.1.0-beta.1`. The version
-will remain a prerelease until production signing and release QA are complete.
+This is the first public test build. It is intentionally unsigned while trusted open-source
+signing is pending; release checksums, an SPDX SBOM, and GitHub provenance attestations accompany
+the downloadable artifacts.

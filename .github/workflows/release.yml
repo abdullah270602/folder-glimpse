@@ -192,9 +192,148 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  unsigned-beta-release:
+    name: Verify, attest, and publish unsigned beta
+    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.prepare.outputs.prerelease == 'true'
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Enforce unsigned beta policy
+        shell: pwsh
+        run: >-
+          ./scripts/Test-UnsignedPrereleaseRepository.ps1
+          -RepositoryRoot . -Version '${{ needs.prepare.outputs.version }}'
+
+      - name: Restore release dependency graph for SBOM
+        run: >-
+          dotnet restore src/FolderGlimpse/FolderGlimpse.csproj
+          --configfile NuGet.config -r win-x64
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+
+      - name: Download unsigned candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+          path: artifacts/candidate
+
+      - name: Microsoft Defender scan
+        shell: pwsh
+        run: |
+          $platform = Join-Path $env:ProgramData 'Microsoft\Windows Defender\Platform'
+          $scanner = Get-ChildItem $platform -Filter MpCmdRun.exe -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if ($scanner) {
+            & $scanner.FullName -Scan -ScanType 3 -File (Resolve-Path artifacts/candidate/FolderGlimpse.exe)
+            if ($LASTEXITCODE -ne 0) { throw "Microsoft Defender scan failed with exit code $LASTEXITCODE." }
+          } else {
+            Write-Warning 'Microsoft Defender command-line scanner is unavailable on this runner.'
+          }
+
+      - name: Generate SPDX SBOM for the unsigned executable
+        shell: pwsh
+        run: |
+          $toolDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom-tool'
+          $manifestDirectory = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-sbom'
+          New-Item $manifestDirectory -ItemType Directory -Force | Out-Null
+          dotnet tool install Microsoft.Sbom.DotNetTool --version 4.1.5 --tool-path $toolDirectory
+          & (Join-Path $toolDirectory 'sbom-tool.exe') generate `
+            -b artifacts/candidate -bc src -m $manifestDirectory `
+            -pn FolderGlimpse -pv '${{ needs.prepare.outputs.version }}' `
+            -ps 'Abdullah Naseem' -nsb 'https://github.com/abdullah270602/folder-glimpse'
+          $manifest = @(Get-ChildItem $manifestDirectory -Filter manifest.spdx.json -Recurse)
+          if ($manifest.Count -ne 1) { throw "Expected exactly one SPDX manifest, found $($manifest.Count)." }
+          New-Item artifacts/sbom -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $manifest[0].FullName -Destination artifacts/sbom/FolderGlimpse.spdx.json
+
+      - name: Build and validate unsigned beta bundle
+        shell: pwsh
+        run: >-
+          ./scripts/New-ReleaseBundle.ps1
+          -SourceExecutable artifacts/candidate/FolderGlimpse.exe
+          -SbomPath artifacts/sbom/FolderGlimpse.spdx.json
+          -OutputDirectory artifacts/final
+          -Version '${{ needs.prepare.outputs.version }}'
+
+      - name: Extract and launch unsigned ZIP smoke test
+        shell: pwsh
+        run: |
+          $extract = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-beta-smoke'
+          Expand-Archive artifacts/final/FolderGlimpse-win-x64.zip -DestinationPath $extract
+          $capture = Join-Path $env:RUNNER_TEMP 'FolderGlimpse-beta-home.png'
+          & (Join-Path $extract 'FolderGlimpse.exe') "--capture-main=$capture" --capture-section=Home --capture-theme=Dark
+          for ($attempt = 0; $attempt -lt 30 -and -not (Test-Path -LiteralPath $capture); $attempt++) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path -LiteralPath $capture) -or (Get-Item -LiteralPath $capture).Length -lt 1000) {
+            throw 'The unsigned beta ZIP did not pass its launch smoke test.'
+          }
+
+      - name: Attest unsigned beta provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            artifacts/final/FolderGlimpse.exe
+            artifacts/final/FolderGlimpse-win-x64.zip
+            artifacts/final/FolderGlimpse.spdx.json
+            artifacts/final/SHA256SUMS.txt
+
+      - name: Attest executable SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: artifacts/final/FolderGlimpse.exe
+          sbom-path: artifacts/final/FolderGlimpse.spdx.json
+
+      - name: Upload immutable unsigned beta bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: FolderGlimpse-unsigned-beta-${{ needs.prepare.outputs.version }}
+          path: artifacts/final/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create unsigned GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $warning = @'
+          ## Unsigned beta
+
+          This public beta is intentionally **not Authenticode-signed** while FolderGlimpse awaits
+          approval for trusted open-source signing. Windows SmartScreen may show an unrecognized-app
+          warning. Download only from this GitHub repository and verify `SHA256SUMS.txt` or the
+          GitHub build attestation. Do not disable SmartScreen or install a root certificate.
+          '@
+          gh release create '${{ needs.prepare.outputs.tag }}' `
+            artifacts/final/FolderGlimpse.exe `
+            artifacts/final/FolderGlimpse-win-x64.zip `
+            artifacts/final/FolderGlimpse.spdx.json `
+            artifacts/final/SHA256SUMS.txt `
+            --verify-tag --prerelease --generate-notes --notes $warning `
+            --title 'FolderGlimpse ${{ needs.prepare.outputs.tag }} (unsigned beta)'
+
   sign-and-release:
     name: Sign, verify, attest, and release
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.prepare.outputs.prerelease == 'false'
     needs: prepare
     runs-on: windows-latest
     timeout-minutes: 45

@@ -1,8 +1,9 @@
 # Distribution roadmap
 
-## V1: signed portable release
+## V1: portable beta, then trusted stable release
 
-Retain a self-contained Windows 11 x64 portable EXE as the smallest reliable first distribution:
+Retain a self-contained Windows 11 x64 portable EXE as the smallest reliable first distribution.
+The initial beta is explicitly unsigned; stable releases require trusted Authenticode signing:
 
 - `FolderGlimpse.exe`
 - `FolderGlimpse-win-x64.zip`

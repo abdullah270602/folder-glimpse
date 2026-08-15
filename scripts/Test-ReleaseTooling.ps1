@@ -42,11 +42,12 @@ try {
         files = @([ordered]@{ fileName = './FolderGlimpse.exe'; SPDXID = 'SPDXRef-File-FolderGlimpse'; checksums = @([ordered]@{ algorithm = 'SHA256'; checksumValue = $sourceHash }) })
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $sbom -Encoding utf8
 
-    foreach ($name in @('LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md', 'CODE_OF_CONDUCT.md')) {
+    foreach ($name in @('LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md', 'CODE_OF_CONDUCT.md', 'SUPPORT.md')) {
         Set-Content -LiteralPath (Join-Path $releaseRepository $name) -Value 'release fixture' -Encoding utf8
     }
     Set-Content -LiteralPath (Join-Path $releaseRepository 'README.md') -Value 'Verified signed FolderGlimpse release.' -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $releaseRepository 'CHANGELOG.md') -Value "## [$($resolved.Version)]" -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $releaseRepository 'CHANGELOG.md') `
+        -Value "## [$($resolved.Version)]`n`n## [0.1.0-beta.1]" -Encoding utf8
     & (Join-Path $PSScriptRoot 'Test-ProductionRepository.ps1') `
         -RepositoryRoot $releaseRepository -Version $resolved.Version | Out-Null
 
@@ -62,6 +63,23 @@ try {
         & (Join-Path $PSScriptRoot 'Test-ProductionRepository.ps1') `
             -RepositoryRoot $releaseRepository -Version $resolved.Version | Out-Null
     } 'Missing-license production gate'
+    Set-Content -LiteralPath (Join-Path $releaseRepository 'LICENSE') -Value 'release fixture' -Encoding utf8
+
+    Set-Content -LiteralPath (Join-Path $releaseRepository 'README.md') `
+        -Value 'FolderGlimpse unsigned beta downloads are published only through https://github.com/abdullah270602/folder-glimpse/releases.' -Encoding utf8
+    & (Join-Path $PSScriptRoot 'Test-UnsignedPrereleaseRepository.ps1') `
+        -RepositoryRoot $releaseRepository -Version '0.1.0-beta.1' | Out-Null
+    Assert-Throws {
+        & (Join-Path $PSScriptRoot 'Test-UnsignedPrereleaseRepository.ps1') `
+            -RepositoryRoot $releaseRepository -Version '1.0.0' | Out-Null
+    } 'Unsigned stable release gate'
+    Set-Content -LiteralPath (Join-Path $releaseRepository 'README.md') `
+        -Value 'FolderGlimpse unsigned beta: users should disable SmartScreen and use https://github.com/abdullah270602/folder-glimpse/releases.' -Encoding utf8
+    Assert-Throws {
+        & (Join-Path $PSScriptRoot 'Test-UnsignedPrereleaseRepository.ps1') `
+            -RepositoryRoot $releaseRepository -Version '0.1.0-beta.1' | Out-Null
+    } 'Unsafe SmartScreen bypass guidance'
+    Set-Content -LiteralPath (Join-Path $releaseRepository 'README.md') -Value 'Verified signed FolderGlimpse release.' -Encoding utf8
 
     & (Join-Path $PSScriptRoot 'New-ReleaseBundle.ps1') `
         -SourceExecutable $source -SbomPath $sbom -OutputDirectory $bundle -Version $resolved.Version | Out-Null

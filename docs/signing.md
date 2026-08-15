@@ -1,6 +1,8 @@
 # Production code signing
 
-FolderGlimpse production releases must be Authenticode-signed and RFC 3161 timestamped. The
+FolderGlimpse stable production releases must be Authenticode-signed and RFC 3161 timestamped. A
+temporary unsigned beta/RC channel is governed separately by the
+[code-signing policy](code-signing-policy.md); it never claims a trusted publisher identity. The
 private signing key must remain in an HSM or managed signing service and must never be committed,
 exported into the repository, or printed by CI.
 
