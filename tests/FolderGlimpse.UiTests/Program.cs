@@ -2,6 +2,11 @@ using FolderGlimpse.Core.Interaction;
 using FolderGlimpse.Core.FolderInspection;
 using FolderGlimpse.Core.Settings;
 using FolderGlimpse.Preview;
+using FolderGlimpse.Updates;
+using FolderGlimpse.Input;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 
 namespace FolderGlimpse.UiTests;
 
@@ -50,7 +55,30 @@ internal static class Program
                 defaults with { InteractiveItems = false });
             False(window.EntryList.IsHitTestVisible, "the interaction master switch must disable hover clicks");
 
-            Console.WriteLine("8/8 WPF preview interaction checks passed");
+            const string releases = """
+                [
+                  { "tag_name": "v0.1.0-beta.2", "draft": false, "html_url": "https://github.com/abdullah270602/folder-glimpse/releases/tag/v0.1.0-beta.2" },
+                  { "tag_name": "v0.1.0-beta.3", "draft": false, "html_url": "https://github.com/abdullah270602/folder-glimpse/releases/tag/v0.1.0-beta.3" },
+                  { "tag_name": "v9.0.0", "draft": true, "html_url": "https://github.com/abdullah270602/folder-glimpse/releases/tag/v9.0.0" }
+                ]
+                """;
+            var update = new GitHubUpdateChecker(new JsonHandler(releases), "0.1.0-beta.2")
+                .CheckAsync().GetAwaiter().GetResult();
+            True(update.UpdateAvailable && update.LatestVersion == "0.1.0-beta.3",
+                "manual update checks include newer published beta releases and ignore drafts");
+            True(update.ReleasePage?.Host == "github.com", "update links remain on the official GitHub host");
+            var stableUpdate = new GitHubUpdateChecker(new JsonHandler(releases), "0.1.0")
+                .CheckAsync().GetAwaiter().GetResult();
+            False(stableUpdate.UpdateAvailable, "stable builds do not opt users into prerelease updates");
+
+            using (var mouseHook = new MouseTriggerHook(_ => null))
+            {
+                mouseHook.Start(true);
+                mouseHook.SetEnabled(false);
+                mouseHook.SetEnabled(true);
+            }
+
+            Console.WriteLine("12/12 WPF, update, and native hook checks passed");
             return 0;
         }
         catch (Exception exception)
@@ -66,6 +94,18 @@ internal static class Program
     }
 
     private static void False(bool value, string message) => True(!value, message);
+
+    private sealed class JsonHandler(string json) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            True(request.Headers.UserAgent.Count > 0, "GitHub requests include a User-Agent");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            });
+        }
+    }
 
     private sealed class NoOpShellLauncher : IShellLauncher
     {

@@ -89,6 +89,7 @@ public sealed class JsonSettingsService : ISettingsService
             HoverCloseDelayMs = document.HoverCloseDelayMs ?? defaults.HoverCloseDelayMs,
             HoverMovementTolerancePx = document.HoverMovementTolerancePx ?? defaults.HoverMovementTolerancePx,
             HoverModifier = document.HoverModifier ?? defaults.HoverModifier,
+            MouseTriggers = document.MouseTriggers ?? defaults.MouseTriggers,
             InteractiveItems = document.InteractiveItems ?? defaults.InteractiveItems,
             DoubleClickFilesToOpen = document.DoubleClickFilesToOpen ?? defaults.DoubleClickFilesToOpen,
             DoubleClickFoldersToOpen = document.DoubleClickFoldersToOpen ?? defaults.DoubleClickFoldersToOpen,
@@ -153,6 +154,7 @@ public sealed class JsonSettingsService : ISettingsService
         public int? HoverCloseDelayMs { get; set; }
         public int? HoverMovementTolerancePx { get; set; }
         public HoverModifier? HoverModifier { get; set; }
+        public MouseTriggerOptions? MouseTriggers { get; set; }
         public bool? InteractiveItems { get; set; }
         public bool? DoubleClickFilesToOpen { get; set; }
         public bool? DoubleClickFoldersToOpen { get; set; }

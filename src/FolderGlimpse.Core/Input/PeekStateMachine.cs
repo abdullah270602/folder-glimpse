@@ -73,6 +73,13 @@ public sealed class PeekStateMachine
         return Result(false, PeekAction.PromoteSticky);
     }
 
+    public StateTransition OpenPointerSticky()
+    {
+        if (State != PeekState.Idle) return Result(false);
+        State = PeekState.StickyOpen;
+        return Result(false, PeekAction.OpenSticky);
+    }
+
     public StateTransition SpaceUp()
     {
         switch (State)

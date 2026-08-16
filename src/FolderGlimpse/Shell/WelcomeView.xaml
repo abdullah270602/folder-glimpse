@@ -4,13 +4,20 @@
       <StackPanel>
         <branding:BrandMark Width="66" Height="66" HorizontalAlignment="Center"/>
         <TextBlock HorizontalAlignment="Center" Margin="0,17,0,0" FontSize="28" FontWeight="SemiBold"><Run Text="Folder"/><Run Text="Glimpse" Foreground="{DynamicResource BrandBlueBrush}"/></TextBlock>
-        <TextBlock Text="Glance inside folders without opening them, and so much more." HorizontalAlignment="Center" Margin="0,6,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"/>
-        <TextBlock Text="See inside folders instantly" Margin="0,26,0,12" FontSize="17" FontWeight="SemiBold"/>
-        <TextBlock Text="1   Open File Explorer"/><TextBlock Text="2   Select any folder" Margin="0,9,0,0"/><TextBlock Margin="0,9,0,0"><Run Text="3   Press "/><Run Text="{Binding ShortcutText, Mode=OneWay}"/></TextBlock>
-        <Grid Margin="0,22,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding TapTitle}" FontWeight="SemiBold"/><TextBlock Text="{Binding TapDescription}" Foreground="{DynamicResource SubtleTextBrush}"/></StackPanel><StackPanel Grid.Column="1"><TextBlock Text="{Binding HoldTitle}" FontWeight="SemiBold"/><TextBlock Text="Preview while held" Foreground="{DynamicResource SubtleTextBrush}"/></StackPanel></Grid>
-        <CheckBox x:Name="StartupCheck" Content="Start FolderGlimpse when I sign in" Margin="0,24,0,0"/>
+        <TextBlock Text="See inside folders without opening them." HorizontalAlignment="Center" Margin="0,6,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"/>
+        <TextBlock Text="Your first glimpse" Margin="0,26,0,12" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock Text="1   Open File Explorer"/>
+        <TextBlock Text="2   Rest the pointer over any folder" Margin="0,9,0,0"/>
+        <TextBlock Text="3   Move away to close, or click an item to pin the glimpse" Margin="0,9,0,0" TextWrapping="Wrap"/>
+        <Border Style="{StaticResource SettingsCardStyle}" Padding="15,12" Margin="0,22,0,0">
+          <StackPanel>
+            <TextBlock Text="Keyboard alternative" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"><Run Text="Select a folder, then tap or hold "/><Run Text="{Binding ShortcutText, Mode=OneWay}" FontWeight="SemiBold"/><Run Text=". Mouse shortcuts are available later in Settings."/></TextBlock>
+          </StackPanel>
+        </Border>
+        <CheckBox x:Name="StartupCheck" Content="Start FolderGlimpse when I sign in" Margin="0,24,0,0" AutomationProperties.Name="Start FolderGlimpse when I sign in"/>
         <TextBlock x:Name="ErrorText" Foreground="#D13438" Margin="0,10,0,0" TextWrapping="Wrap"/>
-        <Button Content="Get Started" Margin="0,20,0,0" Height="38" Style="{StaticResource PrimaryButtonStyle}" IsDefault="True" Click="GetStartedClicked"/>
+        <Button Content="Get Started" Margin="0,20,0,0" Height="38" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="Complete FolderGlimpse setup" IsDefault="True" Click="GetStartedClicked"/>
       </StackPanel>
     </Border>
   </Grid>

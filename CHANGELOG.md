@@ -5,6 +5,21 @@ All notable FolderGlimpse changes will be documented here. The project follows
 
 ## Unreleased
 
+### Added
+
+- Added opt-in middle-click, exact Ctrl+left-click, and exact Ctrl+right-click shortcuts for opening
+  a sticky glimpse over a verified local Explorer folder.
+- Added a manual update check on the About page that reads official GitHub release metadata and
+  opens the release page without downloading or executing an update.
+- Updated first-run guidance to teach hover and click-to-pin before the keyboard alternative.
+- Added a privacy-safe Copy diagnostics action for support reports, excluding user and folder paths.
+
+### Security
+
+- Mouse shortcuts fail open for stale or uncertain targets, injected input, extra modifiers, files,
+  blank space, non-Explorer windows, and unsupported Explorer surfaces. Their global hook is not
+  installed while all mouse shortcuts are off.
+
 ## [0.1.0-beta.2] - 2026-08-16
 
 ### Changed

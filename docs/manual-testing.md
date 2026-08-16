@@ -151,6 +151,14 @@ folders and opens nothing automatically.
 - [ ] Test None, exact Ctrl, and exact Shift hover modifiers. Verify extra modifiers, mouse
       buttons, drag/drop, Explorer menus, search, rename, navigation tree, desktop, and other
       applications never open a hover preview.
+- [ ] With every mouse shortcut off, verify ordinary middle-, left-, and right-click behavior
+      remains unchanged and the optional low-level mouse hook is not installed.
+- [ ] Enable each mouse shortcut separately. Verify its exact gesture over a local folder opens a
+      sticky glimpse, suppresses the matching down/up pair, and works in Details and icon layouts.
+- [ ] Repeat every enabled mouse shortcut over a file, blank space, search, address bar, rename,
+      navigation tree, another app, and immediately after moving rows. Verify it passes through.
+- [ ] Verify Ctrl+Shift+left/right and injected mouse input pass through. Disable a shortcut while
+      its button is held and verify the owned release is suppressed before the hook unloads.
 - [ ] While hover is open, press the configured keyboard trigger and verify keyboard ownership
       cleanly replaces hover ownership. Open the FolderGlimpse shell and verify hover closes.
 - [ ] Compare Task Manager CPU with hover Off, Selected folder, and Any folder while idle and

@@ -5,6 +5,8 @@ namespace FolderGlimpse;
 internal static class NativeMethods
 {
     internal const int WhKeyboardLl = 13;
+    internal const int WhMouseLl = 14;
+    internal const uint PmNoRemove = 0;
     internal const int WmKeyDown = 0x0100;
     internal const int WmKeyUp = 0x0101;
     internal const int WmSysKeyDown = 0x0104;
@@ -20,6 +22,14 @@ internal static class NativeMethods
     internal const int VkRButton = 0x02;
     internal const int VkMButton = 0x04;
     internal const uint LlkhfInjected = 0x10;
+    internal const uint LlmhfInjected = 0x01;
+    internal const int WmMouseMove = 0x0200;
+    internal const int WmLButtonDown = 0x0201;
+    internal const int WmLButtonUp = 0x0202;
+    internal const int WmRButtonDown = 0x0204;
+    internal const int WmRButtonUp = 0x0205;
+    internal const int WmMButtonDown = 0x0207;
+    internal const int WmMButtonUp = 0x0208;
     internal const int GwlExStyle = -20;
     internal const long WsExToolWindow = 0x00000080L;
     internal const long WsExNoActivate = 0x08000000L;
@@ -33,6 +43,7 @@ internal static class NativeMethods
     internal const int DwmwcpRoundSmall = 3;
     internal const uint WmQuit = 0x0012;
     internal const uint WmAppRefreshExplorer = 0x8001;
+    internal const uint WmAppConfigureMouseHook = 0x8002;
     internal const uint EventSystemForeground = 0x0003;
     internal const uint EventObjectFocus = 0x8005;
     internal const uint EventObjectSelectionWithin = 0x8009;
@@ -48,6 +59,16 @@ internal static class NativeMethods
     {
         internal uint VkCode;
         internal uint ScanCode;
+        internal uint Flags;
+        internal uint Time;
+        internal nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MsllHookStruct
+    {
+        internal Point Point;
+        internal uint MouseData;
         internal uint Flags;
         internal uint Time;
         internal nuint ExtraInfo;
@@ -95,11 +116,15 @@ internal static class NativeMethods
     }
 
     internal delegate nint LowLevelKeyboardProc(int code, nint wParam, nint lParam);
+    internal delegate nint LowLevelMouseProc(int code, nint wParam, nint lParam);
     internal delegate void WinEventProc(nint hook, uint eventType, nint window, int objectId, int childId,
         uint eventThread, uint eventTime);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint module, uint threadId);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
+    internal static extern nint SetWindowsHookExMouse(int idHook, LowLevelMouseProc callback, nint module, uint threadId);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -110,6 +135,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern int GetMessage(out Msg message, nint window, uint min, uint max);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool PeekMessage(out Msg message, nint window, uint min, uint max, uint remove);
 
     [DllImport("user32.dll")]
     internal static extern bool PostThreadMessage(uint threadId, uint message, nint wParam, nint lParam);

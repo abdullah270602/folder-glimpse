@@ -10,6 +10,7 @@ using FolderGlimpse.Core.Settings;
 using FolderGlimpse.Settings;
 using FolderGlimpse.Startup;
 using FolderGlimpse.Theming;
+using FolderGlimpse.Updates;
 
 namespace FolderGlimpse.Shell;
 
@@ -29,7 +30,7 @@ public partial class MainWindow : Window, IDisposable
     private bool _disposed;
 
     internal MainWindow(ISettingsService settings, IStartupRegistration startup, IApplicationStateService appState,
-        ThemeManager theme, Func<bool> getEnabled, Action<bool> setEnabled)
+        ThemeManager theme, IUpdateChecker updates, Func<bool> getEnabled, Action<bool> setEnabled)
     {
         _appState = appState;
         _startup = startup;
@@ -40,7 +41,7 @@ public partial class MainWindow : Window, IDisposable
         _home = new HomeView(_viewModel);
         _settings = new SettingsView(settings, startup);
         _howToUse = new HowToUseView(_viewModel);
-        _about = new AboutView();
+        _about = new AboutView(updates, settings);
         _welcome = new WelcomeView(startup.IsEnabled);
         _settings.HomeRequested += () => Navigate(ShellSection.Home);
         _welcome.GetStartedRequested += CompleteOnboarding;

@@ -23,6 +23,10 @@ public enum HoverPreviewMode { Off, SelectedFolder, AnyFolder }
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum HoverModifier { None, Control, Shift }
 
+[Flags]
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum MouseTriggerOptions { None = 0, MiddleClick = 1, ControlLeftClick = 2, ControlRightClick = 4 }
+
 public sealed record FolderGlimpseSettings
 {
     public ThemePreference Theme { get; init; } = ThemePreference.System;
@@ -46,6 +50,7 @@ public sealed record FolderGlimpseSettings
     public int HoverCloseDelayMs { get; init; } = 250;
     public int HoverMovementTolerancePx { get; init; } = 6;
     public HoverModifier HoverModifier { get; init; } = global::FolderGlimpse.Core.Settings.HoverModifier.None;
+    public MouseTriggerOptions MouseTriggers { get; init; } = MouseTriggerOptions.None;
     public bool InteractiveItems { get; init; } = true;
     public bool DoubleClickFilesToOpen { get; init; } = true;
     public bool DoubleClickFoldersToOpen { get; init; } = true;
@@ -70,6 +75,8 @@ public sealed record FolderGlimpseSettings
     public FolderGlimpseSettings Normalize()
     {
         var validLimits = InitialItemLimit is 0 or 20 or 50 or 100 or 200;
+        const MouseTriggerOptions validMouseTriggers = MouseTriggerOptions.MiddleClick |
+            MouseTriggerOptions.ControlLeftClick | MouseTriggerOptions.ControlRightClick;
         return this with
         {
             Theme = Enum.IsDefined(Theme) ? Theme : ThemePreference.System,
@@ -86,6 +93,7 @@ public sealed record FolderGlimpseSettings
             HoverCloseDelayMs = Math.Clamp(HoverCloseDelayMs, 100, 1000),
             HoverMovementTolerancePx = Math.Clamp(HoverMovementTolerancePx, 2, 16),
             HoverModifier = Enum.IsDefined(HoverModifier) ? HoverModifier : global::FolderGlimpse.Core.Settings.HoverModifier.None,
+            MouseTriggers = (MouseTriggers & ~validMouseTriggers) == 0 ? MouseTriggers : MouseTriggerOptions.None,
             ConfirmBeforeOpeningMoreThan = Math.Clamp(ConfirmBeforeOpeningMoreThan, 2, 50)
         };
     }

@@ -31,6 +31,11 @@ Settings are independent and persistent:
 - movement tolerance: 2–16 physical pixels;
 - modifier: None / Ctrl / Shift.
 
+Users may also opt into exact mouse shortcuts for middle-click, Ctrl+left-click, and
+Ctrl+right-click. They open sticky mode directly and are off by default. The mouse hook exists only
+while one or more shortcuts are enabled and can consume a gesture only from a fresh, pre-resolved
+folder target under the pointer. Normal clicks are never treated as shortcuts.
+
 Keyboard access remains available in every hover mode. Users can configure Space or Ctrl+Space,
 then choose tap-to-toggle or hold-only behavior. These are alternative trigger styles; the app
 does not register arbitrary simultaneous keyboard shortcuts. Changing hover settings cancels an
@@ -38,8 +43,8 @@ active hover glimpse and applies to the next dwell.
 
 ## Safety policy
 
-Hover fails closed: uncertainty means no preview, but it never blocks, injects, or changes mouse
-input. The following always cancel or reject a hover:
+Hover and pointer targeting fail closed: uncertainty means no preview or mouse-shortcut capture.
+The following always cancel or reject a hover and leave unowned mouse input unchanged:
 
 - Explorer is not foreground, or its frame/process changed;
 - a mouse button is held, a drag/capture is active, or an unsupported modifier is down;

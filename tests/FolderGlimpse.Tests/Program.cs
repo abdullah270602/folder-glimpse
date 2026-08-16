@@ -11,6 +11,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Input eligibility policy", TestEligibility),
     ("Hover preview state and eligibility", TestHoverPreview),
     ("Hover sampling policy", TestHoverSamplingPolicy),
+    ("Mouse trigger safety and pointer cache", TestMouseTriggers),
     ("Hover UI Automation ancestry policy", TestHoverElementPolicy),
     ("Explorer focus ancestry policy", TestExplorerFocusPolicy),
     ("Folder enumeration", TestEnumeration),
@@ -19,6 +20,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Settings location migration", TestSettingsMigration),
     ("Startup registration migration", TestStartupMigration),
     ("Launch, onboarding, and activation policy", TestApplicationLifecycle),
+    ("Semantic update version ordering", TestSemanticVersions),
+    ("Privacy-safe diagnostic report", TestDiagnosticReport),
     ("Product identity metadata", TestProductIdentity),
     ("Interactive selection model", TestSelection),
     ("Safe item activation", TestActivation),
@@ -26,6 +29,34 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Context action policy", TestContextActions),
     ("Popup positioning", TestPositioning)
 };
+
+static Task TestSemanticVersions()
+{
+    True(SemanticVersion.TryParse("v0.1.0-beta.2+build", out var beta2), "tag and build metadata parse");
+    True(SemanticVersion.TryParse("0.1.0-beta.10", out var beta10), "multi-digit prerelease parses");
+    True(SemanticVersion.TryParse("0.1.0", out var stable), "stable version parses");
+    True(beta10.CompareTo(beta2) > 0, "numeric prerelease identifiers use numeric ordering");
+    True(stable.CompareTo(beta10) > 0, "stable release sorts after its prereleases");
+    True(SemanticVersion.TryParse("1.0.0-alpha.1", out var alpha1), "dotted prerelease parses");
+    True(SemanticVersion.TryParse("1.0.0-alpha.beta", out var alphaBeta), "text prerelease parses");
+    True(alphaBeta.CompareTo(alpha1) > 0, "numeric prerelease identifiers sort before text identifiers");
+    False(SemanticVersion.TryParse("1.0", out _), "incomplete versions fail closed");
+    False(SemanticVersion.TryParse("1.0.0-", out _), "empty prerelease fails closed");
+    return Task.CompletedTask;
+}
+
+static Task TestDiagnosticReport()
+{
+    var report = DiagnosticReport.Create(FolderGlimpseSettings.Default with
+    {
+        MouseTriggers = MouseTriggerOptions.MiddleClick | MouseTriggerOptions.ControlRightClick
+    }, "0.1.0-beta.2", "Windows test", "X64", ".NET test");
+    True(report.Contains("0.1.0-beta.2", StringComparison.Ordinal), "report includes product version");
+    True(report.Contains("MiddleClick", StringComparison.Ordinal), "report includes relevant trigger configuration");
+    False(report.Contains("C:\\", StringComparison.Ordinal), "report contains no local path");
+    False(report.Contains("user", StringComparison.OrdinalIgnoreCase), "report contains no user identity field");
+    return Task.CompletedTask;
+}
 
 var failed = 0;
 foreach (var test in tests)
@@ -77,6 +108,12 @@ static Task TestStateMachine()
     machine = new PeekStateMachine();
     machine.SpaceDown(true);
     Equal(PeekAction.None, machine.PromoteToSticky().Action, "pointer promotion cannot interrupt an owned Space gesture");
+
+    machine = new PeekStateMachine();
+    var mouseOpen = machine.OpenPointerSticky();
+    Equal(PeekState.StickyOpen, mouseOpen.State, "mouse shortcut opens sticky state");
+    Equal(PeekAction.OpenSticky, mouseOpen.Action, "mouse shortcut loads a new sticky preview");
+    False(mouseOpen.Suppress, "mouse shortcut state does not claim keyboard input");
 
     machine = new PeekStateMachine();
     machine.SpaceDown(true); machine.HoldThresholdElapsed();
@@ -211,6 +248,62 @@ static Task TestHoverSamplingPolicy()
         "a background Explorer window does not keep the sampler awake");
     False(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.AnyFolder, explorer, 0),
         "an unknown Explorer context does not sample");
+    True(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.Off, MouseTriggerOptions.MiddleClick, explorer, explorer),
+        "an enabled mouse shortcut keeps pointer targeting active when hover is off");
+    return Task.CompletedTask;
+}
+
+static Task TestMouseTriggers()
+{
+    var now = DateTimeOffset.UtcNow;
+    var point = new HoverPoint(120, 220);
+    var target = new ExplorerSnapshot(true, "Pointer target", 42, 84, 7, @"C:\Folder", "Folder",
+        new PixelRect(100, 200, 300, 280), now, 1);
+    MouseTriggerInput Input(MouseTriggerButton button, bool control = false, bool shift = false, bool injected = false,
+        HoverPoint? at = null, nint? foreground = null, DateTimeOffset? time = null) =>
+        new(button, at ?? point, control, shift, false, false, injected, foreground ?? 42, time ?? now);
+
+    Equal(MouseTriggerOptions.MiddleClick, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Middle)),
+        "clean middle click maps to its shortcut");
+    Equal(MouseTriggerOptions.ControlLeftClick, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Left, control: true)),
+        "exact Ctrl-left maps to its shortcut");
+    Equal(MouseTriggerOptions.ControlRightClick, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Right, control: true)),
+        "exact Ctrl-right maps to its shortcut");
+    Equal(MouseTriggerOptions.None, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Left)), "ordinary left click always passes");
+    Equal(MouseTriggerOptions.None, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Right, control: true, shift: true)),
+        "extra modifiers fail open");
+    Equal(MouseTriggerOptions.None, MouseTriggerPolicy.Match(Input(MouseTriggerButton.Middle, injected: true)),
+        "injected mouse input fails open");
+    True(MouseTriggerPolicy.CanCapture(MouseTriggerOptions.MiddleClick, Input(MouseTriggerButton.Middle), target,
+        TimeSpan.FromMilliseconds(1500)), "fresh configured folder target is captured");
+    True(MouseTriggerPolicy.CanCapture(MouseTriggerOptions.MiddleClick | MouseTriggerOptions.ControlLeftClick,
+        Input(MouseTriggerButton.Left, control: true), target, TimeSpan.FromMilliseconds(1500)),
+        "combined shortcut settings preserve each exact gesture");
+    True(MouseTriggerPolicy.IsFreshTargetAtPoint(target, point, 42, now, TimeSpan.FromMilliseconds(1500)),
+        "fresh pointer targets can be safely reused by hover resolution");
+    False(MouseTriggerPolicy.CanCapture(MouseTriggerOptions.ControlLeftClick, Input(MouseTriggerButton.Middle), target,
+        TimeSpan.FromMilliseconds(1500)), "unconfigured gesture passes");
+    False(MouseTriggerPolicy.CanCapture(MouseTriggerOptions.MiddleClick, Input(MouseTriggerButton.Middle, at: new(301, 220)), target,
+        TimeSpan.FromMilliseconds(1500)), "point outside cached item passes");
+    False(MouseTriggerPolicy.CanCapture(MouseTriggerOptions.MiddleClick,
+        Input(MouseTriggerButton.Middle, time: now.AddSeconds(2)), target, TimeSpan.FromMilliseconds(1500)),
+        "stale target passes");
+
+    var cache = new PointerTargetCacheStateMachine();
+    Equal(PointerTargetAction.Clear, cache.Observe(point, now, 6, TimeSpan.FromMilliseconds(150), TimeSpan.FromSeconds(1)).Action,
+        "new pointer candidate clears stale cache");
+    Equal(PointerTargetAction.None, cache.Observe(point, now.AddMilliseconds(149), 6,
+        TimeSpan.FromMilliseconds(150), TimeSpan.FromSeconds(1)).Action, "prefetch waits for stability");
+    var resolve = cache.Observe(point, now.AddMilliseconds(150), 6, TimeSpan.FromMilliseconds(150), TimeSpan.FromSeconds(1));
+    Equal(PointerTargetAction.Resolve, resolve.Action, "stable pointer requests target resolution");
+    Equal(PointerTargetPhase.Resolving, cache.Resolved(resolve.Generation - 1, true, now.AddMilliseconds(170)).Phase,
+        "a stale resolver generation cannot publish over the current target");
+    Equal(PointerTargetPhase.Ready, cache.Resolved(resolve.Generation, true, now.AddMilliseconds(180)).Phase,
+        "eligible target becomes ready");
+    Equal(PointerTargetAction.Resolve, cache.Observe(point, now.AddMilliseconds(1180), 6,
+        TimeSpan.FromMilliseconds(150), TimeSpan.FromSeconds(1)).Action, "stationary target refreshes before it goes stale");
+    Equal(PointerTargetAction.Clear, cache.Observe(new(130, 220), now.AddMilliseconds(1200), 6,
+        TimeSpan.FromMilliseconds(150), TimeSpan.FromSeconds(1)).Action, "meaningful movement invalidates target immediately");
     return Task.CompletedTask;
 }
 
@@ -366,8 +459,10 @@ static Task TestSettings()
         Equal(250, service.Current.HoverCloseDelayMs, "hover close grace has a usable default");
         Equal(6, service.Current.HoverMovementTolerancePx, "hover movement tolerance defaults to six pixels");
         Equal(HoverModifier.None, service.Current.HoverModifier, "hover requires no modifier by default");
+        Equal(MouseTriggerOptions.None, service.Current.MouseTriggers, "mouse shortcuts are opt-in by default");
         True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100,
             HoverMode = HoverPreviewMode.AnyFolder, HoverModifier = HoverModifier.Control,
+            MouseTriggers = MouseTriggerOptions.MiddleClick | MouseTriggerOptions.ControlRightClick,
             HoverOpenDelayMs = 900, HoverCloseDelayMs = 400, HoverMovementTolerancePx = 10,
             InteractiveItems = false, DoubleClickFilesToOpen = false, DoubleClickFoldersToOpen = false,
             RightClickActions = false, MultiSelection = false, ShowSelectionCheckboxes = true,
@@ -389,6 +484,8 @@ static Task TestSettings()
         Equal(900, reloaded.Current.HoverOpenDelayMs, "hover open delay round trips");
         Equal(400, reloaded.Current.HoverCloseDelayMs, "hover close delay round trips");
         Equal(10, reloaded.Current.HoverMovementTolerancePx, "hover movement tolerance round trips");
+        Equal(MouseTriggerOptions.MiddleClick | MouseTriggerOptions.ControlRightClick, reloaded.Current.MouseTriggers,
+            "combined mouse shortcuts round trip");
 
         File.WriteAllText(path, "{ \"showFileSize\": false, \"unknownFutureField\": 123 }");
         reloaded.Load();
@@ -401,6 +498,7 @@ static Task TestSettings()
         True(reloaded.TryUpdate(s => s with { PopupWidth = 9999, HoldThresholdMs = 1, InitialItemLimit = 17,
             HoverOpenDelayMs = 1, HoverCloseDelayMs = 9000, HoverMovementTolerancePx = 100,
             HoverMode = (HoverPreviewMode)999, HoverModifier = (HoverModifier)999,
+            MouseTriggers = (MouseTriggerOptions)128,
             ConfirmBeforeOpeningMoreThan = 500 }, out _), "invalid values normalize");
         Equal(700d, reloaded.Current.PopupWidth, "width clamps high");
         Equal(100, reloaded.Current.HoldThresholdMs, "hold delay clamps low");
@@ -411,6 +509,7 @@ static Task TestSettings()
         Equal(16, reloaded.Current.HoverMovementTolerancePx, "hover tolerance clamps high");
         Equal(HoverPreviewMode.AnyFolder, reloaded.Current.HoverMode, "invalid hover mode falls back to the product default");
         Equal(HoverModifier.None, reloaded.Current.HoverModifier, "invalid hover modifier fails to none");
+        Equal(MouseTriggerOptions.None, reloaded.Current.MouseTriggers, "unknown mouse trigger flags fail open to none");
         True(reloaded.TryUpdate(s => s with { ConfirmBeforeOpeningMoreThan = 1 }, out _), "low confirmation threshold normalizes");
         Equal(2, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps low");
     }
