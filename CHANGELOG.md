@@ -5,6 +5,8 @@ All notable FolderGlimpse changes will be documented here. The project follows
 
 ## Unreleased
 
+## [0.1.0-beta.2] - 2026-08-16
+
 ### Changed
 
 - Enabled Any-folder hover by default on fresh installs and resets while retaining Space as the
