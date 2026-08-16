@@ -2,13 +2,14 @@
 
 Hover is FolderGlimpse's pointer-first way to glimpse a folder without opening it or changing
 Explorer selection. It works alongside the configurable keyboard trigger rather than replacing
-it. Hover ships disabled until the user explicitly chooses one of two targeting modes:
+it. Any-folder hover is enabled by default on a fresh install. Users can choose between:
 
 - **Selected folder** — preview only when the pointer rests on the single selected folder. This is
   the conservative V1 mode and reuses the existing selection/focus proof.
 - **Any folder** — preview an unselected filesystem folder under the pointer. This V2 mode uses UI
   Automation only after dwell, then resolves the UIA display name through the active Explorer
   Shell view. UIA metadata is never treated as an authoritative filesystem path.
+- **Off** — stop pointer sampling entirely while retaining the configured keyboard trigger.
 
 ## User-visible behavior
 

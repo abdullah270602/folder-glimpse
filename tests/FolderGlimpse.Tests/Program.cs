@@ -321,7 +321,8 @@ static Task TestSettings()
         False(service.Current.ShowSelectionCheckboxes, "selection checkboxes default off");
         True(service.Current.AllowOpeningMultipleItems && service.Current.ClosePreviewAfterOpening, "safe opening defaults on");
         Equal(5, service.Current.ConfirmBeforeOpeningMoreThan, "confirmation default is five");
-        Equal(HoverPreviewMode.Off, service.Current.HoverMode, "hover is opt-in by default");
+        Equal(HoverPreviewMode.AnyFolder, service.Current.HoverMode, "any-folder hover is enabled by default");
+        Equal(TriggerHotkey.Space, service.Current.Hotkey, "Space remains the default keyboard trigger");
         Equal(650, service.Current.HoverOpenDelayMs, "hover delay has a conservative default");
         Equal(250, service.Current.HoverCloseDelayMs, "hover close grace has a usable default");
         Equal(6, service.Current.HoverMovementTolerancePx, "hover movement tolerance defaults to six pixels");
@@ -369,7 +370,7 @@ static Task TestSettings()
         Equal(150, reloaded.Current.HoverOpenDelayMs, "hover open delay clamps low");
         Equal(1000, reloaded.Current.HoverCloseDelayMs, "hover close delay clamps high");
         Equal(16, reloaded.Current.HoverMovementTolerancePx, "hover tolerance clamps high");
-        Equal(HoverPreviewMode.Off, reloaded.Current.HoverMode, "invalid hover mode fails to off");
+        Equal(HoverPreviewMode.AnyFolder, reloaded.Current.HoverMode, "invalid hover mode falls back to the product default");
         Equal(HoverModifier.None, reloaded.Current.HoverModifier, "invalid hover modifier fails to none");
         True(reloaded.TryUpdate(s => s with { ConfirmBeforeOpeningMoreThan = 1 }, out _), "low confirmation threshold normalizes");
         Equal(2, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps low");

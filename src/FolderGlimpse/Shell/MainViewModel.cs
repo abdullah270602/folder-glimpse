@@ -31,7 +31,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public string StatusText => IsEnabled ? "FolderGlimpse is active" : "FolderGlimpse is paused";
-    public string StatusDetail => IsEnabled ? "Ready in File Explorer" : "Preview shortcuts are temporarily disabled";
+    public string StatusDetail => IsEnabled ? "Ready in File Explorer" : "Preview triggers are temporarily disabled";
     public string ShortcutText => _settings.Current.Hotkey == TriggerHotkey.ControlSpace ? "Ctrl + Space" : "Space";
     public string TapTitle => _settings.Current.TapBehavior == TapBehavior.MomentaryOnly ? "Tap disabled" : $"Tap {ShortcutText}";
     public string TapDescription => _settings.Current.TapBehavior == TapBehavior.MomentaryOnly ? "Hold the shortcut to preview" : "Keep a glimpse open";

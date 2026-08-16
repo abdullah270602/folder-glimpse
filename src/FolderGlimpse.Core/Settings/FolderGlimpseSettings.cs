@@ -41,7 +41,7 @@ public sealed record FolderGlimpseSettings
     public TriggerHotkey Hotkey { get; init; } = TriggerHotkey.Space;
     public int HoldThresholdMs { get; init; } = 200;
     public TapBehavior TapBehavior { get; init; } = TapBehavior.TogglePreview;
-    public HoverPreviewMode HoverMode { get; init; } = HoverPreviewMode.Off;
+    public HoverPreviewMode HoverMode { get; init; } = HoverPreviewMode.AnyFolder;
     public int HoverOpenDelayMs { get; init; } = 650;
     public int HoverCloseDelayMs { get; init; } = 250;
     public int HoverMovementTolerancePx { get; init; } = 6;
@@ -81,7 +81,7 @@ public sealed record FolderGlimpseSettings
             Hotkey = Enum.IsDefined(Hotkey) ? Hotkey : TriggerHotkey.Space,
             HoldThresholdMs = Math.Clamp(HoldThresholdMs, 100, 600),
             TapBehavior = Enum.IsDefined(TapBehavior) ? TapBehavior : TapBehavior.TogglePreview,
-            HoverMode = Enum.IsDefined(HoverMode) ? HoverMode : HoverPreviewMode.Off,
+            HoverMode = Enum.IsDefined(HoverMode) ? HoverMode : HoverPreviewMode.AnyFolder,
             HoverOpenDelayMs = Math.Clamp(HoverOpenDelayMs, 150, 2000),
             HoverCloseDelayMs = Math.Clamp(HoverCloseDelayMs, 100, 1000),
             HoverMovementTolerancePx = Math.Clamp(HoverMovementTolerancePx, 2, 16),

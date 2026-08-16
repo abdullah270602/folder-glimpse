@@ -130,7 +130,7 @@ folders and opens nothing automatically.
 - [ ] Open **Settings…** and exercise every control; restart and verify values persisted.
 - [ ] Change System/Light/Dark while the popup and Settings are open; verify immediate readable updates.
 - [ ] Test Space and exact Ctrl+Space modes, 100/600 ms hold limits, Toggle and Momentary Only.
-- [ ] Leave hover **Off** and verify ordinary pointer movement never opens a preview.
+- [ ] Switch hover to **Off** and verify ordinary pointer movement never opens a preview.
 - [ ] Select **Selected folder**, hover the selected row, and verify the preview opens only after
       the configured delay. Hover an unselected folder and verify it stays closed.
 - [ ] Select **Any folder** and hover several unselected folders without clicking. Verify the
