@@ -11,6 +11,9 @@ All notable FolderGlimpse changes will be documented here. The project follows
   default keyboard trigger.
 - Reworked Home and How to Use around the hover-first workflow, with keyboard tap/hold presented
   as a configurable alternative.
+- Added deliberate click-to-pin promotion from a hover glimpse to the existing sticky interactive
+  popup without closing or reloading it.
+- Stopped high-frequency hover pointer sampling whenever Explorer is not foreground.
 - Clarified the recommended portable ZIP download and distinguished user downloads from checksum
   and SBOM metadata.
 

@@ -10,6 +10,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Tap/hold state machine", TestStateMachine),
     ("Input eligibility policy", TestEligibility),
     ("Hover preview state and eligibility", TestHoverPreview),
+    ("Hover sampling policy", TestHoverSamplingPolicy),
     ("Hover UI Automation ancestry policy", TestHoverElementPolicy),
     ("Explorer focus ancestry policy", TestExplorerFocusPolicy),
     ("Folder enumeration", TestEnumeration),
@@ -65,6 +66,17 @@ static Task TestStateMachine()
     var passed = new PeekStateMachine().SpaceDown(false);
     Equal(PeekState.Idle, passed.State, "ineligible down stays idle");
     False(passed.Suppress, "ineligible down passes");
+
+    machine = new PeekStateMachine();
+    var promoted = machine.PromoteToSticky();
+    Equal(PeekState.StickyOpen, promoted.State, "pointer promotion opens sticky state");
+    Equal(PeekAction.PromoteSticky, promoted.Action, "pointer promotion reuses the visible preview");
+    False(promoted.Suppress, "pointer promotion does not claim keyboard input");
+    Equal(PeekAction.Close, machine.Escape(true).Action, "Escape closes a pointer-promoted sticky preview");
+
+    machine = new PeekStateMachine();
+    machine.SpaceDown(true);
+    Equal(PeekAction.None, machine.PromoteToSticky().Action, "pointer promotion cannot interrupt an owned Space gesture");
 
     machine = new PeekStateMachine();
     machine.SpaceDown(true); machine.HoldThresholdElapsed();
@@ -172,6 +184,33 @@ static Task TestHoverPreview()
         steady.ObserveCandidate(point, start.AddSeconds(2), 6, dwell);
     var steadyAllocations = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
     True(steadyAllocations <= 1024, "steady rejected-target sampling remains effectively allocation-free");
+
+    var promotable = new HoverPreviewStateMachine();
+    promotable.ObserveCandidate(point, start, 6, TimeSpan.Zero);
+    var promotableResolve = promotable.ObserveCandidate(point, start, 6, TimeSpan.Zero);
+    promotable.Resolved(promotableResolve.Generation, true);
+    var promotion = promotable.Promote();
+    Equal(HoverAction.Promote, promotion.Action, "open hover can be deliberately promoted");
+    Equal(HoverPhase.Idle, promotion.Phase, "promotion releases hover ownership without closing the popup");
+    Equal(HoverAction.None, promotable.Promote().Action, "idle hover cannot be promoted twice");
+    return Task.CompletedTask;
+}
+
+static Task TestHoverSamplingPolicy()
+{
+    var explorer = new nint(42);
+    True(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.AnyFolder, explorer, explorer),
+        "enabled hover samples while Explorer is foreground");
+    True(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.SelectedFolder, explorer, explorer),
+        "selected-folder hover samples while Explorer is foreground");
+    False(HoverSamplingPolicy.ShouldSample(false, HoverPreviewMode.AnyFolder, explorer, explorer),
+        "disabled app does not sample hover");
+    False(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.Off, explorer, explorer),
+        "off mode does not sample hover");
+    False(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.AnyFolder, new nint(7), explorer),
+        "a background Explorer window does not keep the sampler awake");
+    False(HoverSamplingPolicy.ShouldSample(true, HoverPreviewMode.AnyFolder, explorer, 0),
+        "an unknown Explorer context does not sample");
     return Task.CompletedTask;
 }
 
@@ -636,6 +675,8 @@ static Task TestPreviewInteractionRouting()
     True(ItemActionPolicy.CanHitTestEntries(PreviewInteractionMode.Sticky, defaults), "sticky previews accept pointer input");
     False(ItemActionPolicy.CanSelect(PreviewInteractionMode.HoverPointer, defaults), "hover click does not steal selection or keyboard focus");
     True(ItemActionPolicy.CanSelect(PreviewInteractionMode.Sticky, defaults), "sticky preview supports selection");
+    True(ItemActionPolicy.CanPromoteHover(PreviewInteractionMode.HoverPointer, defaults), "hover click may deliberately promote to sticky");
+    False(ItemActionPolicy.CanPromoteHover(PreviewInteractionMode.ViewOnly, defaults), "momentary preview cannot be promoted");
 
     True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, folder, defaults), "hover double-click opens folders");
     True(ItemActionPolicy.CanDoubleClick(PreviewInteractionMode.HoverPointer, file, defaults), "hover double-click opens files");
@@ -666,6 +707,7 @@ static Task TestPreviewInteractionRouting()
     {
         False(ItemActionPolicy.CanHitTestEntries(mode, disabled), $"interaction master switch blocks hit testing in {mode}");
         False(ItemActionPolicy.CanSelect(mode, disabled), $"interaction master switch blocks selection in {mode}");
+        False(ItemActionPolicy.CanPromoteHover(mode, disabled), $"interaction master switch blocks promotion in {mode}");
         False(ItemActionPolicy.CanDoubleClick(mode, folder, disabled), $"interaction master switch blocks folder activation in {mode}");
         False(ItemActionPolicy.CanUseContextActions(mode, disabled), $"interaction master switch blocks context actions in {mode}");
     }

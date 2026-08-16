@@ -131,9 +131,9 @@ configured <kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> shortcut to keep
 or hold it for a momentary look. Tap the shortcut again or press <kbd>Esc</kbd> to close a sticky
 glimpse. The shortcut and tap/hold behavior can be changed in Settings.
 
-Hover glimpses stay non-activating so they never take keyboard focus from Explorer, but you can
-double-click an item to open it. Tap the keyboard trigger when you want a fully interactive sticky
-glimpse with selection, keyboard navigation, context actions, and opening controls.
+Hover glimpses stay non-activating until you deliberately interact with them. Click an item once
+to pin the existing glimpse and make it interactive, or double-click an item to open it. The
+configured keyboard trigger remains another way to open a sticky glimpse directly.
 
 In an interactive sticky preview:
 

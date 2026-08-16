@@ -29,6 +29,7 @@ public partial class PreviewWindow : Window
     internal PreviewViewModel ViewModel { get; } = new();
     internal event Func<IReadOnlyList<FolderEntry>, Task>? OpenRequested;
     internal event Action? CloseRequested;
+    internal event Action? PromoteRequested;
 
     internal PreviewWindow(IShellLauncher launcher)
     {
@@ -100,6 +101,9 @@ public partial class PreviewWindow : Window
         EntryList.Cursor = _interactionMode == PreviewInteractionMode.HoverPointer
             ? System.Windows.Input.Cursors.Hand
             : System.Windows.Input.Cursors.Arrow;
+        EntryList.ToolTip = _interactionMode == PreviewInteractionMode.HoverPointer
+            ? "Click an item to pin this glimpse. Double-click to open it."
+            : null;
         var needsSelectionRefresh = _selection.SelectedCount > 0;
         if (!selectable) _selection.Clear();
         else if (!settings.MultiSelection && _selection.SelectedIndices.Count > 1)
@@ -107,6 +111,20 @@ public partial class PreviewWindow : Window
         if (needsSelectionRefresh) RefreshSelection();
         else ViewModel.SelectedCount = 0;
         SetInteractiveStyle(selectable);
+    }
+
+    internal bool TryPromoteEntry(int index)
+    {
+        if (index < 0 || index >= ViewModel.Entries.Count ||
+            !ItemActionPolicy.CanPromoteHover(_interactionMode, _settings)) return false;
+
+        PromoteRequested?.Invoke();
+        if (ItemActionPolicy.CanSelect(_interactionMode, _settings))
+        {
+            _selection.Select(index, ViewModel.Entries.Count, multiSelection: _settings.MultiSelection);
+            RefreshSelection(index);
+        }
+        return true;
     }
 
     internal void SetDetached(bool detached)
@@ -218,6 +236,11 @@ public partial class PreviewWindow : Window
             DiagnosticsLog.Write($"preview pointer mode={_interactionMode} clicks={e.ClickCount} entry={entry.FullPath}");
         if (_interactionMode == PreviewInteractionMode.HoverPointer)
         {
+            if (e.ClickCount == 1 && TryPromoteEntry(index))
+            {
+                e.Handled = true;
+                return;
+            }
             if (e.ClickCount == 2 &&
                 ItemActionPolicy.ActivationTargetsForDoubleClick(_interactionMode, entry, _settings) is { Count: > 0 } targets)
                 _ = RequestOpenAsync(targets);

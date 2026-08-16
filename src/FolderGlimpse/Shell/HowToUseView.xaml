@@ -60,8 +60,9 @@
         <TextBlock Text="Open items" Style="{StaticResource SectionTitleStyle}"/>
         <Border Style="{StaticResource SettingsCardStyle}" Margin="0" Padding="18,15">
           <StackPanel>
-            <TextBlock Text="Double-click a file to use its normal Windows app, or double-click a folder to open it in File Explorer." TextWrapping="Wrap"/>
-            <TextBlock Text="A keyboard-triggered sticky glimpse also supports selection, context actions, and Enter to open." Margin="0,9,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"/>
+            <TextBlock Text="Click an item once to pin the hover glimpse and make it interactive." TextWrapping="Wrap"/>
+            <TextBlock Text="Double-click a file to use its normal Windows app, or double-click a folder to open it in File Explorer." Margin="0,9,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="A pinned or keyboard-triggered glimpse supports selection, context actions, and Enter to open." Margin="0,9,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </StackPanel>

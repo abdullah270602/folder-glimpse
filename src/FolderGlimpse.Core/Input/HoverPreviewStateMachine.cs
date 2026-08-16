@@ -14,7 +14,7 @@ public readonly record struct HoverPoint(int X, int Y)
     }
 }
 
-public enum HoverAction { None, Resolve, Open, Close }
+public enum HoverAction { None, Resolve, Open, Promote, Close }
 
 public readonly record struct HoverTransition(HoverPhase Phase, HoverAction Action, long Generation);
 
@@ -85,6 +85,14 @@ public sealed class HoverPreviewStateMachine
             return new(Phase, HoverAction.Close, ++_generation);
         }
         return new(Phase, HoverAction.None, _generation);
+    }
+
+    public HoverTransition Promote()
+    {
+        if (Phase is not (HoverPhase.Open or HoverPhase.ClosingGrace))
+            return new(Phase, HoverAction.None, _generation);
+        Phase = HoverPhase.Idle;
+        return new(Phase, HoverAction.Promote, ++_generation);
     }
 
     public HoverTransition Cancel()

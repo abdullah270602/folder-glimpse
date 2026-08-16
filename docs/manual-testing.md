@@ -136,11 +136,14 @@ folders and opens nothing automatically.
 - [ ] Select **Any folder** and hover several unselected folders without clicking. Verify the
       correct folder opens, fast pointer sweeps never flash stale previews, and A → B → C cannot
       publish an old A/B result over C.
-- [ ] Move into an open hover glimpse and double-click a child folder, then a file. Verify Windows
-      opens the exact item, the glimpse closes, and Explorer retained keyboard focus until launch.
-- [ ] In a hover glimpse, verify single-click, right-click, selection checkboxes, and keyboard input
-      do not enter sticky interaction mode. Disable each double-click setting and verify its matching
-      item type no longer opens.
+- [ ] In an Any-folder hover glimpse, single-click an item. Verify the same popup becomes sticky,
+      takes focus only after that click, selects the clicked row, and does not reload its contents.
+- [ ] Double-click an item from a hover glimpse. Verify the first click promotes the popup and the
+      second click opens the exact item once. Press Escape afterward and verify focus returns to
+      the originating Explorer window.
+- [ ] Disable interactive items, open a hover glimpse, and verify its rows cannot pin, select, open,
+      or expose context actions. Re-enable interaction, disable each double-click setting, and verify
+      its matching item type no longer opens after promotion.
 - [ ] Repeat any-folder hover over the Name column in Details view and over tiles in Medium,
       Large, and Extra large icons views; verify the correct folder opens in every layout.
 - [ ] Exercise minimum/maximum open delay, exit delay, and movement tolerance. Move from the

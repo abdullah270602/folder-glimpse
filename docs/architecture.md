@@ -22,7 +22,8 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
 - `Input` owns a `WH_KEYBOARD_LL` hook and an explicit tap/hold state machine. The hook
   performs no COM, UIA, filesystem, WPF, or blocking work. It may consume Space only
   from a fresh eligible snapshot whose HWND still equals `GetForegroundWindow()`.
-- Optional hover input uses a separate 20 Hz sampler that is stopped while hover is off.
+- Optional hover input uses a separate 20 Hz sampler that runs only while Explorer is the
+  foreground application and is stopped everywhere else, including while hover is off.
   Before the dwell threshold it performs only cursor, modifier, mouse-button, and foreground
   HWND checks. Any-folder resolution is latest-request-wins on isolated UIA MTA and Shell STA
   workers; enumeration and icon extraction remain in the cancellable preview pipeline.
@@ -33,7 +34,8 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
 - `FolderInspection` enumerates only immediate children, asynchronously, with
   cancellation and a bounded initial result set. Directories sort before files.
 - `Preview` is one reusable WPF tool window. Momentary mode remains non-activating and
-  read-only; sticky mode explicitly takes focus for standard mouse and keyboard interaction.
+  read-only; hover mode remains non-activating until a deliberate row click promotes the existing
+  popup to sticky mode, which explicitly takes focus for standard mouse and keyboard interaction.
   Placement is computed in physical pixels against the selected monitor work area and
   applied with `SetWindowPos`.
 - `Interaction` owns a UI-independent selection model plus Shell-launch and confirmation

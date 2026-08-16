@@ -27,6 +27,7 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
     internal bool IsInvalidated => Volatile.Read(ref _invalidated) == 1;
     internal nint CurrentExplorerWindow => Volatile.Read(ref _currentExplorerWindow);
     internal int CurrentExplorerProcessId => Volatile.Read(ref _currentExplorerProcessId);
+    internal event Action? ExplorerContextChanged;
 
     internal ExplorerSnapshotMonitor()
     {
@@ -126,6 +127,7 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
         var foreground = NativeMethods.GetForegroundWindow();
         if (foreground == 0)
         {
+            SetExplorerContext(0, 0);
             return ExplorerSnapshot.Ineligible("No foreground window", now, generation);
         }
 
@@ -135,12 +137,10 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
             using var process = Process.GetProcessById((int)pid);
             if (!string.Equals(process.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase))
             {
-                Volatile.Write(ref _currentExplorerWindow, 0);
-                Volatile.Write(ref _currentExplorerProcessId, 0);
+                SetExplorerContext(0, 0);
                 return ExplorerSnapshot.Ineligible("Foreground is not Explorer", now, generation);
             }
-            Volatile.Write(ref _currentExplorerWindow, foreground);
-            Volatile.Write(ref _currentExplorerProcessId, (int)pid);
+            SetExplorerContext(foreground, (int)pid);
 
             if (_focusTask is { IsCompleted: false })
                 return ExplorerSnapshot.Ineligible("UI Automation worker is still busy", now, generation);
@@ -174,6 +174,7 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
         catch (Exception exception) when (exception is COMException or InvalidOperationException or UnauthorizedAccessException)
         {
             Debug.WriteLine($"FolderGlimpse snapshot: {exception.Message}");
+            if (CurrentExplorerWindow != foreground) SetExplorerContext(0, 0);
             return ExplorerSnapshot.Ineligible(exception.GetType().Name, now, generation);
         }
     }
@@ -283,6 +284,13 @@ internal sealed class ExplorerSnapshotMonitor : IDisposable
     private static void Release(object? value)
     {
         if (value is not null && Marshal.IsComObject(value)) Marshal.FinalReleaseComObject(value);
+    }
+
+    private void SetExplorerContext(nint window, int processId)
+    {
+        var oldWindow = Interlocked.Exchange(ref _currentExplorerWindow, window);
+        var oldProcessId = Interlocked.Exchange(ref _currentExplorerProcessId, processId);
+        if (oldWindow != window || oldProcessId != processId) ExplorerContextChanged?.Invoke();
     }
 
     public void Dispose()

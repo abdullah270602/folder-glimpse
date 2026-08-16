@@ -68,6 +68,9 @@ public static class ItemActionPolicy
     public static bool CanSelect(PreviewInteractionMode mode, FolderGlimpseSettings settings) =>
         settings.InteractiveItems && mode == PreviewInteractionMode.Sticky;
 
+    public static bool CanPromoteHover(PreviewInteractionMode mode, FolderGlimpseSettings settings) =>
+        settings.InteractiveItems && mode == PreviewInteractionMode.HoverPointer;
+
     public static bool CanDoubleClick(PreviewInteractionMode mode, FolderEntry entry, FolderGlimpseSettings settings) =>
         CanHitTestEntries(mode, settings) &&
         (entry.IsDirectory ? settings.DoubleClickFoldersToOpen : settings.DoubleClickFilesToOpen);
