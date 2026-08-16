@@ -70,6 +70,9 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         HoverModifierBox.SelectedItem = FindChoice(HoverModifierBox, s.HoverModifier);
         HoverOpenSlider.Value = s.HoverOpenDelayMs; HoverCloseSlider.Value = s.HoverCloseDelayMs;
         HoverToleranceSlider.Value = s.HoverMovementTolerancePx;
+        MouseMiddleCheck.IsChecked = s.MouseTriggers.HasFlag(MouseTriggerOptions.MiddleClick);
+        MouseCtrlLeftCheck.IsChecked = s.MouseTriggers.HasFlag(MouseTriggerOptions.ControlLeftClick);
+        MouseCtrlRightCheck.IsChecked = s.MouseTriggers.HasFlag(MouseTriggerOptions.ControlRightClick);
         InteractiveCheck.IsChecked = s.InteractiveItems; DoubleFileCheck.IsChecked = s.DoubleClickFilesToOpen;
         DoubleFolderCheck.IsChecked = s.DoubleClickFoldersToOpen; RightClickCheck.IsChecked = s.RightClickActions;
         MultiCheck.IsChecked = s.MultiSelection; SelectionCheckboxCheck.IsChecked = s.ShowSelectionCheckboxes;
@@ -85,6 +88,9 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         if (_loading || !IsLoaded) return;
         UpdateLabels();
         var limit = (LimitBox.SelectedItem as Choice<int>)?.Value ?? 50;
+        var mouseTriggers = (MouseMiddleCheck.IsChecked == true ? MouseTriggerOptions.MiddleClick : MouseTriggerOptions.None) |
+            (MouseCtrlLeftCheck.IsChecked == true ? MouseTriggerOptions.ControlLeftClick : MouseTriggerOptions.None) |
+            (MouseCtrlRightCheck.IsChecked == true ? MouseTriggerOptions.ControlRightClick : MouseTriggerOptions.None);
         var saved = _settings.TryUpdate(s => s with
         {
             Theme = (ThemeBox.SelectedItem as Choice<ThemePreference>)?.Value ?? s.Theme,
@@ -102,6 +108,7 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
             HoverOpenDelayMs = (int)HoverOpenSlider.Value,
             HoverCloseDelayMs = (int)HoverCloseSlider.Value,
             HoverMovementTolerancePx = (int)HoverToleranceSlider.Value,
+            MouseTriggers = mouseTriggers,
             InteractiveItems = InteractiveCheck.IsChecked == true,
             DoubleClickFilesToOpen = DoubleFileCheck.IsChecked == true,
             DoubleClickFoldersToOpen = DoubleFolderCheck.IsChecked == true,

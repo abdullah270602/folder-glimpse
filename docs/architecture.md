@@ -27,6 +27,10 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
   Before the dwell threshold it performs only cursor, modifier, mouse-button, and foreground
   HWND checks. Any-folder resolution is latest-request-wins on isolated UIA MTA and Shell STA
   workers; enumeration and icon extraction remain in the cancellable preview pipeline.
+- Optional mouse shortcuts share that pointer-target cache. A `WH_MOUSE_LL` hook is installed only
+  while at least one mouse shortcut is enabled. Its callback performs only exact gesture matching,
+  foreground/bounds/freshness checks against an immutable cached snapshot, and queue publication;
+  it never calls UIA, Shell COM, the filesystem, or WPF. A captured down/up pair is kept whole.
 - Explorer eligibility refresh is event-driven. Out-of-context WinEvent hooks invalidate on
   foreground, focus, selection, and item-location changes; a 75 ms debounce avoids querying UIA
   while Explorer is rebuilding a row, and a slow three-second fallback covers providers that
@@ -45,6 +49,9 @@ Explorer. Four isolated areas are joined by immutable records and small interfac
   same-directory temporary file and atomic replacement; invalid, missing, or partial files
   recover to normalized defaults. Startup registration remains a separate Windows source
   of truth under the current user's Run key.
+- `Updates` performs only a user-initiated, timeout-bounded read of the public GitHub Releases API.
+  Semantic version comparison is isolated in Core and release URLs are restricted to github.com.
+  The application does not download, replace, or execute update artifacts.
 
 The application is per-monitor-V2 DPI aware and x64. A tray icon controls enable/disable,
 settings, launch-at-sign-in, About, and exit. Release logging is off; debug logging records

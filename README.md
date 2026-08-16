@@ -27,14 +27,15 @@
 FolderGlimpse shows a compact preview when you rest the pointer over a folder in File
 Explorer—without opening it or leaving the folder you are viewing. Choose any-folder hover,
 selected-folder hover, or an optional Ctrl/Shift hover modifier. Prefer the keyboard? Configure
-<kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> with tap and hold behavior.
+<kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> with tap and hold behavior. Optional exact
+mouse shortcuts can open a sticky glimpse with middle-click, Ctrl+left-click, or Ctrl+right-click.
 
 ![FolderGlimpse folder preview](docs/preview.svg)
 
 ## Highlights
 
 - **Hover to glimpse** folders directly from Windows 11 File Explorer
-- **Flexible trigger options** with any-folder hover, selected-only hover, and modifiers
+- **Flexible trigger options** with hover, keyboard, and opt-in exact mouse shortcuts
 - **Configurable keyboard access** using Space or Ctrl+Space with tap and hold behavior
 - **Open files and folders** directly from an interactive sticky preview
 - **Multi-select and context actions** with familiar Windows interactions
@@ -124,6 +125,14 @@ exit FolderGlimpse from the tray, and replace the previous EXE with the extracte
 previews. You can also require <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while hovering and adjust the
 open delay, exit grace, and movement tolerance.
 
+### Optional mouse shortcuts
+
+In **Settings → Mouse shortcuts**, you can enable middle-click,
+<kbd>Ctrl</kbd>+left-click, or <kbd>Ctrl</kbd>+right-click for folders. These shortcuts are off by
+default. FolderGlimpse consumes only an enabled exact gesture over a recently verified local folder;
+ordinary clicks, files, blank space, stale targets, injected input, and uncertain Explorer contexts
+continue to Windows normally.
+
 ### Keyboard trigger
 
 Keyboard access remains available alongside hover. Select one normal local folder, then tap the
@@ -148,13 +157,22 @@ Closing the control-center window does not exit FolderGlimpse; it continues runn
 the notification area. The tray menu provides **Open FolderGlimpse**, **Enabled**, **Settings…**,
 **Launch at startup**, and **Exit**. To stop the app completely, choose **Exit**.
 
+The About page has a manual **Check for updates** action. It reads published release metadata from
+the official GitHub repository and, when a newer version exists, opens its release page for you.
+FolderGlimpse never silently downloads, replaces, or runs an unsigned update.
+The adjacent **Copy diagnostics** action creates a compact support summary of the version, runtime,
+architecture, and relevant settings; it intentionally excludes file paths and user identity.
+
 ## Safety and privacy
 
 FolderGlimpse works offline, requires no administrator privileges, performs no telemetry,
-and does not modify previewed folders. Its hover and keyboard triggers use conservative Explorer
-and UI Automation checks. Uncertain hover targets are ignored, and keyboard input passes through
-whenever the context cannot be proven safe—for example, while typing in search, the address bar,
-or a rename field.
+and does not modify previewed folders. Its hover, keyboard, and optional mouse triggers use
+conservative Explorer and UI Automation checks. Uncertain targets are ignored, and input passes
+through whenever the context cannot be proven safe—for example, while typing in search, the
+address bar, or a rename field.
+
+No network request is made during normal preview use. The only in-app network action is the manual
+update check described above.
 
 Settings and application state are stored locally under `%LOCALAPPDATA%\FolderGlimpse`.
 

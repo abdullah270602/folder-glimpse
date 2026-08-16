@@ -17,6 +17,7 @@ using FolderGlimpse.Preview;
 using FolderGlimpse.Shell;
 using FolderGlimpse.Startup;
 using FolderGlimpse.Theming;
+using FolderGlimpse.Updates;
 using FolderGlimpse.Tray;
 using Forms = System.Windows.Forms;
 
@@ -26,6 +27,7 @@ public partial class App : System.Windows.Application
 {
     private readonly PeekStateMachine _state = new();
     private readonly HoverPreviewStateMachine _hoverState = new();
+    private readonly PointerTargetCacheStateMachine _pointerTargetState = new();
     private readonly IFolderInspector _inspector = new FolderInspector();
     private readonly IShellLauncher _shellLauncher = new WindowsShellLauncher();
     private JsonSettingsService? _settings;
@@ -34,6 +36,7 @@ public partial class App : System.Windows.Application
     private ExplorerSnapshotMonitor? _monitor;
     private HoverTargetResolver? _hoverResolver;
     private KeyboardHook? _hook;
+    private MouseTriggerHook? _mouseHook;
     private PreviewWindow? _preview;
     private ItemActivationService? _activation;
     private IApplicationStateService? _appState;
@@ -55,11 +58,15 @@ public partial class App : System.Windows.Application
     private LaunchIntent _launchIntent;
     private volatile bool _enabled = true;
     private int _stickyInputActive;
-    private bool _activationInProgress;
+    private volatile bool _activationInProgress;
     private bool _detachedSticky;
     private long _previewGeneration;
     private ExplorerSnapshot? _hoverTarget;
     private bool _hoverPreviewActive;
+    private ExplorerSnapshot? _pointerTarget;
+    private Task<ExplorerSnapshot?>? _pointerResolution;
+    private int _mouseTriggerOptions;
+    private int _mouseGestureAllowed = 1;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -94,6 +101,7 @@ public partial class App : System.Windows.Application
         SettingsPathMigration.TryMigrate(legacySettingsPath, settingsPath);
         _settings = new JsonSettingsService(settingsPath);
         _settings.Load();
+        Volatile.Write(ref _mouseTriggerOptions, (int)_settings.Current.MouseTriggers);
         _appState = new JsonApplicationStateService(statePath);
         _appState.Load();
         _settings.SettingsChanged += OnSettingsChanged;
@@ -114,6 +122,16 @@ public partial class App : System.Windows.Application
             _monitor.ExplorerContextChanged += OnExplorerContextChanged;
             _monitor.Start();
             _hoverResolver = new HoverTargetResolver();
+            _mouseHook = new MouseTriggerHook(TryCaptureMouseTrigger);
+            _mouseHook.Gesture += OnMouseTriggerGesture;
+            _mouseHook.HookFailed += OnMouseHookFailed;
+            try { _mouseHook.Start(_settings.Current.MouseTriggers != MouseTriggerOptions.None); }
+            catch (Exception exception)
+            {
+                _settings.TryUpdate(settings => settings with { MouseTriggers = MouseTriggerOptions.None }, out _);
+                Forms.MessageBox.Show($"FolderGlimpse started, but its optional mouse shortcuts are unavailable.\n\n{exception.Message}",
+                    "FolderGlimpse", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Warning);
+            }
             _hook = new KeyboardHook(CanBeginTrigger, IsSameEligibleExplorerContext, allowInjectedInput);
             _hook.Gesture += OnHookGesture;
             try { _hook.Start(); }
@@ -251,6 +269,7 @@ public partial class App : System.Windows.Application
     private void Apply(StateTransition transition)
     {
         Volatile.Write(ref _stickyInputActive, transition.State == PeekState.StickyOpen ? 1 : 0);
+        Volatile.Write(ref _mouseGestureAllowed, transition.State == PeekState.Idle ? 1 : 0);
         if (_hook is not null) _hook.CanConsumeEscape = transition.State == PeekState.StickyOpen;
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"state={transition.State} action={transition.Action}");
         switch (transition.Action)
@@ -365,9 +384,10 @@ public partial class App : System.Windows.Application
     {
         if (_hoverTimer is null || _settings is null) return;
         var shouldSample = _monitor is not null && HoverSamplingPolicy.ShouldSample(
-            _enabled, _settings.Current.HoverMode, NativeMethods.GetForegroundWindow(), _monitor.CurrentExplorerWindow);
+            _enabled, _settings.Current.HoverMode, _settings.Current.MouseTriggers,
+            NativeMethods.GetForegroundWindow(), _monitor.CurrentExplorerWindow);
         if (shouldSample) _hoverTimer.Start();
-        else { _hoverTimer.Stop(); CancelHoverPreview(); }
+        else { _hoverTimer.Stop(); CancelHoverPreview(); CancelPointerTarget(); }
     }
 
     private void OnExplorerContextChanged()
@@ -380,8 +400,10 @@ public partial class App : System.Windows.Application
     {
         if (_settings is null || _monitor is null || _preview is null) { CancelHoverPreview(); return; }
         var settings = _settings.Current;
-        if (!HoverEligibilityPolicy.CanSample(_enabled, settings.HoverMode, _state.State == PeekState.Idle,
-            _activationInProgress)) { CancelHoverPreview(); return; }
+        var inputIdle = _state.State == PeekState.Idle && !_activationInProgress;
+        var hoverCanSample = HoverEligibilityPolicy.CanSample(_enabled, settings.HoverMode, inputIdle, _activationInProgress);
+        var mouseCanSample = _enabled && settings.MouseTriggers != MouseTriggerOptions.None && inputIdle;
+        if (!hoverCanSample && !mouseCanSample) { CancelHoverPreview(); CancelPointerTarget(); return; }
         if (!NativeMethods.GetCursorPos(out var nativePoint)) { CancelHoverPreview(); return; }
         var point = new HoverPoint(nativePoint.X, nativePoint.Y);
         var now = DateTimeOffset.UtcNow;
@@ -400,18 +422,26 @@ public partial class App : System.Windows.Application
         }
 
         var buttonsDown = IsDown(NativeMethods.VkLButton) || IsDown(NativeMethods.VkRButton) || IsDown(NativeMethods.VkMButton);
+        if (buttonsDown) return;
+        var foreground = NativeMethods.GetForegroundWindow();
+        var explorerUnderPointer = foreground != 0 && foreground == _monitor.CurrentExplorerWindow &&
+            _monitor.CurrentExplorerProcessId != 0;
+        if (mouseCanSample && explorerUnderPointer)
+            SamplePointerTarget(foreground, _monitor.CurrentExplorerProcessId, point, now, settings);
+        else CancelPointerTarget();
+
+        if (!hoverCanSample) { CancelHoverPreview(); return; }
         var modifiersMatch = HoverEligibilityPolicy.IsModifierMatch(settings.HoverModifier,
             IsDown(NativeMethods.VkControl), IsDown(NativeMethods.VkShift), IsDown(NativeMethods.VkMenu),
             IsDown(NativeMethods.VkLWin) || IsDown(NativeMethods.VkRWin));
-        var foreground = NativeMethods.GetForegroundWindow();
-        if (buttonsDown || !modifiersMatch || foreground == 0) { CancelHoverPreview(); return; }
+        if (!modifiersMatch || foreground == 0) { CancelHoverPreview(); return; }
 
         ExplorerSnapshot? selected = null;
         var candidate = settings.HoverMode switch
         {
             HoverPreviewMode.SelectedFolder => !_monitor.IsInvalidated && HoverEligibilityPolicy.CanUseSelectedSnapshot(
                 selected = _monitor.Current, foreground, point, now, settings.SnapshotMaxAge),
-            HoverPreviewMode.AnyFolder => foreground == _monitor.CurrentExplorerWindow && _monitor.CurrentExplorerProcessId != 0,
+            HoverPreviewMode.AnyFolder => explorerUnderPointer,
             _ => false
         };
         if (!candidate) { CancelHoverPreview(); return; }
@@ -424,7 +454,58 @@ public partial class App : System.Windows.Application
             CompleteHoverResolution(transition.Generation, selected, point, settings);
             return;
         }
+        if (settings.MouseTriggers != MouseTriggerOptions.None)
+        {
+            var cached = Volatile.Read(ref _pointerTarget);
+            if (MouseTriggerPolicy.IsFreshTargetAtPoint(cached, point, foreground, now,
+                TimeSpan.FromMilliseconds(1500)))
+            {
+                CompleteHoverResolution(transition.Generation, cached, point, settings);
+                return;
+            }
+            if (_pointerResolution is { } pending)
+            {
+                _ = CompleteHoverFromPointerAsync(pending, transition.Generation, point, settings);
+                return;
+            }
+        }
         _ = ResolveAnyHoverAsync(foreground, _monitor.CurrentExplorerProcessId, point, transition.Generation, settings);
+    }
+
+    private void SamplePointerTarget(nint foreground, int explorerPid, HoverPoint point, DateTimeOffset now,
+        FolderGlimpseSettings settings)
+    {
+        var transition = _pointerTargetState.Observe(point, now, settings.HoverMovementTolerancePx,
+            TimeSpan.FromMilliseconds(150), TimeSpan.FromMilliseconds(1000));
+        if (transition.Action == PointerTargetAction.Clear) Volatile.Write(ref _pointerTarget, null);
+        if (transition.Action != PointerTargetAction.Resolve || _hoverResolver is null) return;
+        var task = _hoverResolver.ResolveAsync(foreground, explorerPid, point, transition.Generation);
+        _pointerResolution = task;
+        _ = CompletePointerTargetAsync(task, transition.Generation, point, foreground, settings.HoverMovementTolerancePx);
+    }
+
+    private async Task CompletePointerTargetAsync(Task<ExplorerSnapshot?> task, long generation, HoverPoint originalPoint,
+        nint foreground, int tolerance)
+    {
+        var snapshot = await task;
+        await Dispatcher.InvokeAsync(() =>
+        {
+            if (ReferenceEquals(_pointerResolution, task)) _pointerResolution = null;
+            var eligible = NativeMethods.GetForegroundWindow() == foreground && NativeMethods.GetCursorPos(out var cursor) &&
+                new HoverPoint(cursor.X, cursor.Y).DistanceSquared(originalPoint) <= (long)tolerance * tolerance &&
+                snapshot?.ItemBounds is { } bounds && Contains(bounds, new(cursor.X, cursor.Y));
+            var transition = _pointerTargetState.Resolved(generation, eligible, DateTimeOffset.UtcNow);
+            if (transition.Generation == generation && transition.Phase is PointerTargetPhase.Ready or PointerTargetPhase.Rejected)
+                Volatile.Write(ref _pointerTarget, transition.Phase == PointerTargetPhase.Ready ? snapshot : null);
+        }, DispatcherPriority.Background);
+    }
+
+    private async Task CompleteHoverFromPointerAsync(Task<ExplorerSnapshot?> task, long hoverGeneration,
+        HoverPoint point, FolderGlimpseSettings settings)
+    {
+        var snapshot = await task;
+        await Dispatcher.InvokeAsync(() => CompleteHoverResolution(hoverGeneration, snapshot, point, settings),
+            DispatcherPriority.Background);
     }
 
     private async Task ResolveAnyHoverAsync(nint foreground, int explorerPid, HoverPoint point, long generation,
@@ -464,6 +545,46 @@ public partial class App : System.Windows.Application
         var transition = _hoverState.Cancel();
         if (transition.Action == HoverAction.Close) CloseHoverPreview();
     }
+
+    private void CancelPointerTarget()
+    {
+        _pointerTargetState.Cancel();
+        _pointerResolution = null;
+        Volatile.Write(ref _pointerTarget, null);
+    }
+
+    private ExplorerSnapshot? TryCaptureMouseTrigger(MouseTriggerInput input)
+    {
+        if (!_enabled || Volatile.Read(ref _mouseGestureAllowed) == 0) return null;
+        var configured = (MouseTriggerOptions)Volatile.Read(ref _mouseTriggerOptions);
+        var target = Volatile.Read(ref _pointerTarget);
+        return MouseTriggerPolicy.CanCapture(configured, input, target, TimeSpan.FromMilliseconds(1500)) ? target : null;
+    }
+
+    private void OnMouseTriggerGesture(MouseTriggerGesture gesture) =>
+        Dispatcher.BeginInvoke(() => HandleMouseTrigger(gesture), DispatcherPriority.Input);
+
+    private void HandleMouseTrigger(MouseTriggerGesture gesture)
+    {
+        if (_settings is null || !_enabled || _state.State != PeekState.Idle ||
+            !_settings.Current.MouseTriggers.HasFlag(gesture.Trigger) ||
+            NativeMethods.GetForegroundWindow() != gesture.Target.ForegroundWindow ||
+            gesture.Target.ItemBounds is not { } bounds || !Contains(bounds, gesture.ReleasePoint)) return;
+        CancelHoverPreview();
+        CancelPointerTarget();
+        _gestureSnapshot = gesture.Target;
+        _gestureSettings = _settings.Current;
+        if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"mouse trigger={gesture.Trigger} path={gesture.Target.FolderPath}");
+        Apply(_state.OpenPointerSticky());
+    }
+
+    private void OnMouseHookFailed(Exception exception) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_settings is null) return;
+        _settings.TryUpdate(settings => settings with { MouseTriggers = MouseTriggerOptions.None }, out _);
+        Forms.MessageBox.Show($"Mouse shortcuts were turned off because their Windows hook could not be installed.\n\n{exception.Message}",
+            "FolderGlimpse", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Warning);
+    });
 
     private void CloseHoverPreview()
     {
@@ -548,6 +669,12 @@ public partial class App : System.Windows.Application
         if (e.Previous.HoverMode != e.Current.HoverMode || e.Previous.HoverModifier != e.Current.HoverModifier ||
             e.Previous.HoverOpenDelayMs != e.Current.HoverOpenDelayMs || e.Previous.HoverCloseDelayMs != e.Current.HoverCloseDelayMs ||
             e.Previous.HoverMovementTolerancePx != e.Current.HoverMovementTolerancePx) CancelHoverPreview();
+        if (e.Previous.MouseTriggers != e.Current.MouseTriggers)
+        {
+            Volatile.Write(ref _mouseTriggerOptions, (int)e.Current.MouseTriggers);
+            _mouseHook?.SetEnabled(e.Current.MouseTriggers != MouseTriggerOptions.None);
+            CancelPointerTarget();
+        }
         _theme?.SetPreference(e.Current.Theme); ApplyTheme();
         if (e.Current.TapBehavior == TapBehavior.MomentaryOnly && _state.State == PeekState.StickyOpen) Apply(_state.Reset());
         if (_preview?.IsVisible == true) _preview.ConfigureInteraction(
@@ -578,7 +705,8 @@ public partial class App : System.Windows.Application
         if (_state.State != PeekState.Idle) { _holdTimer?.Stop(); Apply(_state.Reset()); }
         if (_mainWindow is null)
         {
-            _mainWindow = new MainWindow(_settings, _startup, _appState, _theme, () => _enabled, SetEnabled);
+            _mainWindow = new MainWindow(_settings, _startup, _appState, _theme, new GitHubUpdateChecker(),
+                () => _enabled, SetEnabled);
         }
         _mainWindow.ShowSurface(surface, activate);
     }
@@ -595,7 +723,7 @@ public partial class App : System.Windows.Application
     {
         _enabled = enabled;
         if (_enabledMenu is not null) _enabledMenu.Checked = enabled;
-        if (!enabled) { _holdTimer?.Stop(); Apply(_state.ContextInvalidated()); CancelHoverPreview(); }
+        if (!enabled) { _holdTimer?.Stop(); Apply(_state.ContextInvalidated()); CancelHoverPreview(); CancelPointerTarget(); }
         ConfigureHoverTimer();
         _mainWindow?.RefreshState();
     }
@@ -710,6 +838,12 @@ public partial class App : System.Windows.Application
         if (_startup is not null) _startup.Changed -= OnStartupRegistrationChanged;
         if (_theme is not null) { _theme.Changed -= OnThemeChanged; _theme.Dispose(); }
         if (_hook is not null) { _hook.Gesture -= OnHookGesture; _hook.Dispose(); }
+        if (_mouseHook is not null)
+        {
+            _mouseHook.Gesture -= OnMouseTriggerGesture;
+            _mouseHook.HookFailed -= OnMouseHookFailed;
+            _mouseHook.Dispose();
+        }
         if (_monitor is not null) _monitor.ExplorerContextChanged -= OnExplorerContextChanged;
         _monitor?.Dispose();
         _hoverResolver?.Dispose();
