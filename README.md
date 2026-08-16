@@ -46,13 +46,19 @@ selected-folder hover, or an optional Ctrl/Shift hover modifier. Prefer the keyb
 
 ## Download and install
 
-FolderGlimpse will initially be distributed as a portable, self-contained Windows x64 app.
-Official release builds will not require a separate .NET installation.
+FolderGlimpse is currently distributed as a portable, self-contained Windows x64 app. It does
+not require a separate .NET installation, administrator access, or a setup wizard.
 
-1. Download **[FolderGlimpse.exe](https://github.com/abdullah270602/folder-glimpse/releases/latest/download/FolderGlimpse.exe)**.
-2. Move it to a permanent folder such as `%LOCALAPPDATA%\Programs\FolderGlimpse`.
-3. Run `FolderGlimpse.exe` and complete the short first-run introduction.
-4. Optionally enable **Launch at startup** in Settings or from the tray menu.
+1. Open the official **[Releases](https://github.com/abdullah270602/folder-glimpse/releases)** page.
+2. Download `FolderGlimpse-win-x64.zip` from the newest beta release.
+3. Extract the ZIP and move `FolderGlimpse.exe` to a permanent folder such as
+   `%LOCALAPPDATA%\Programs\FolderGlimpse`.
+4. Run `FolderGlimpse.exe` and complete the short first-run introduction.
+5. Optionally enable **Launch at startup** after the EXE is in its permanent location.
+
+The separately listed `FolderGlimpse.exe` is the same application offered as a direct download.
+The ZIP is recommended because it gives most users one unambiguous asset to download and extract.
+`SHA256SUMS.txt` and `FolderGlimpse.spdx.json` are verification metadata, not installers.
 
 > [!NOTE]
 > Public beta builds are not Authenticode-signed yet. Windows SmartScreen may show an
@@ -95,8 +101,8 @@ warn, because reputation is evaluated separately.
 
 ### Updating
 
-Download the newest EXE from [Releases](https://github.com/abdullah270602/folder-glimpse/releases)
-and replace the previous file after exiting FolderGlimpse from the tray.
+Download the newest x64 ZIP from [Releases](https://github.com/abdullah270602/folder-glimpse/releases),
+exit FolderGlimpse from the tray, and replace the previous EXE with the extracted newer one.
 
 ### Uninstalling
 
@@ -109,15 +115,14 @@ and replace the previous file after exiting FolderGlimpse from the tray.
 
 ### Hover to glimpse
 
-1. Open **Settings → Hover preview** once and choose **Any folder**.
-2. Rest the pointer over a normal local folder in Windows 11 File Explorer.
-3. After the configured delay, the glimpse appears without changing your selection.
-4. Move into the glimpse to keep it visible while reading; move away to dismiss it.
+1. Rest the pointer over a normal local folder in Windows 11 File Explorer.
+2. After the configured delay, the glimpse appears without changing your selection.
+3. Move into the glimpse to keep it visible while reading; move away to dismiss it.
 
-Choose **Selected folder** if you only want hover to work on the current selection. You can
-also require <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while hovering, and adjust the open delay,
-exit grace, and movement tolerance. Hover is opt-in: it remains completely off until you choose
-a hover mode.
+**Any folder** hover is enabled by default. In **Settings → Hover preview**, choose
+**Selected folder** to limit hover to the current selection, or **Off** to disable pointer
+previews. You can also require <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while hovering and adjust the
+open delay, exit grace, and movement tolerance.
 
 ### Keyboard trigger
 
@@ -126,9 +131,9 @@ configured <kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>Space</kbd> shortcut to keep
 or hold it for a momentary look. Tap the shortcut again or press <kbd>Esc</kbd> to close a sticky
 glimpse. The shortcut and tap/hold behavior can be changed in Settings.
 
-Hover glimpses stay non-activating so they never take keyboard focus from Explorer, but you can
-double-click an item to open it. Tap the keyboard trigger when you want a fully interactive sticky
-glimpse with selection, keyboard navigation, context actions, and opening controls.
+Hover glimpses stay non-activating until you deliberately interact with them. Click an item once
+to pin the existing glimpse and make it interactive, or double-click an item to open it. The
+configured keyboard trigger remains another way to open a sticky glimpse directly.
 
 In an interactive sticky preview:
 

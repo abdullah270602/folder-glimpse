@@ -17,9 +17,9 @@ configured as described in [signing.md](signing.md). The repository is licensed 
 - `CHANGELOG.md` is updated before tagging. GitHub-generated notes supplement rather than replace
   important compatibility, security, and migration notes.
 
-Because FolderGlimpse has not yet had a public, signed release, `v0.1.0-beta.1` is the selected
-first public test version. It is an unsigned beta with checksums, SBOM, provenance, malware scan,
-and launch validation—not a trusted production release.
+Until trusted signing is available, each numbered beta is published with checksums, an SBOM,
+provenance, malware scanning, and launch validation. These controls make the build verifiable;
+they do not turn an unsigned beta into a trusted production release.
 
 ## 1. Prepare
 
@@ -52,15 +52,16 @@ access signing credentials or publish a GitHub Release.
 After committing the reviewed release preparation, create a signed annotated tag locally:
 
 ```powershell
-git tag -s v0.1.0-beta.1 -m "FolderGlimpse v0.1.0-beta.1"
-git tag -v v0.1.0-beta.1
+$version = '0.1.0-beta.2'
+git tag -s "v$version" -m "FolderGlimpse v$version"
+git tag -v "v$version"
 ```
 
 Pushing is an explicit owner action:
 
 ```powershell
 git push origin main
-git push origin v0.1.0-beta.1
+git push origin "v$version"
 ```
 
 The workflow rejects malformed and lightweight tags and ensures the tag resolves to its workflow

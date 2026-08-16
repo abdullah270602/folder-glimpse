@@ -5,6 +5,20 @@ All notable FolderGlimpse changes will be documented here. The project follows
 
 ## Unreleased
 
+## [0.1.0-beta.2] - 2026-08-16
+
+### Changed
+
+- Enabled Any-folder hover by default on fresh installs and resets while retaining Space as the
+  default keyboard trigger.
+- Reworked Home and How to Use around the hover-first workflow, with keyboard tap/hold presented
+  as a configurable alternative.
+- Added deliberate click-to-pin promotion from a hover glimpse to the existing sticky interactive
+  popup without closing or reloading it.
+- Stopped high-frequency hover pointer sampling whenever Explorer is not foreground.
+- Clarified the recommended portable ZIP download and distinguished user downloads from checksum
+  and SBOM metadata.
+
 ## [0.1.0-beta.1] - 2026-08-15
 
 ### Added

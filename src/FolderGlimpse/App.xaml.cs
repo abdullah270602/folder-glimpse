@@ -104,12 +104,14 @@ public partial class App : System.Windows.Application
         _preview = new PreviewWindow(_shellLauncher);
         _preview.OpenRequested += OpenSelectedAsync;
         _preview.CloseRequested += CloseStickyPreview;
+        _preview.PromoteRequested += PromoteHoverPreview;
         _activation = new ItemActivationService(_shellLauncher, new WpfOpenManyConfirmation(_preview, _theme));
         ApplyTheme();
 
         if (!captureMode)
         {
             _monitor = new ExplorerSnapshotMonitor();
+            _monitor.ExplorerContextChanged += OnExplorerContextChanged;
             _monitor.Start();
             _hoverResolver = new HoverTargetResolver();
             _hook = new KeyboardHook(CanBeginTrigger, IsSameEligibleExplorerContext, allowInjectedInput);
@@ -257,6 +259,11 @@ public partial class App : System.Windows.Application
                 if (_gestureSnapshot is { IsEligible: true } stickySnapshot) _ = OpenPreviewAsync(stickySnapshot,
                     _gestureSettings ?? _settings!.Current, PreviewInteractionMode.Sticky);
                 break;
+            case PeekAction.PromoteSticky:
+                if (_gestureSnapshot is { IsEligible: true } promotedSnapshot && _preview is not null)
+                    _preview.ShowBeside(promotedSnapshot.ItemBounds ?? CursorAnchor(),
+                        _gestureSettings ?? _settings!.Current, PreviewInteractionMode.Sticky);
+                break;
             case PeekAction.OpenMomentary:
                 if (_gestureSnapshot is { IsEligible: true } snapshot) _ = OpenPreviewAsync(snapshot,
                     _gestureSettings ?? _settings!.Current, PreviewInteractionMode.ViewOnly);
@@ -357,8 +364,16 @@ public partial class App : System.Windows.Application
     private void ConfigureHoverTimer()
     {
         if (_hoverTimer is null || _settings is null) return;
-        if (_enabled && _settings.Current.HoverMode != HoverPreviewMode.Off) _hoverTimer.Start();
+        var shouldSample = _monitor is not null && HoverSamplingPolicy.ShouldSample(
+            _enabled, _settings.Current.HoverMode, NativeMethods.GetForegroundWindow(), _monitor.CurrentExplorerWindow);
+        if (shouldSample) _hoverTimer.Start();
         else { _hoverTimer.Stop(); CancelHoverPreview(); }
+    }
+
+    private void OnExplorerContextChanged()
+    {
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(ConfigureHoverTimer, DispatcherPriority.Background);
     }
 
     private void SampleHover()
@@ -457,6 +472,19 @@ public partial class App : System.Windows.Application
         _hoverTarget = null;
         if (DiagnosticsLog.Enabled) DiagnosticsLog.Write("hover close");
         ClosePreview();
+    }
+
+    private void PromoteHoverPreview()
+    {
+        if (!_hoverPreviewActive || _hoverTarget is not { IsEligible: true } target || _settings is null) return;
+        var hoverTransition = _hoverState.Promote();
+        if (hoverTransition.Action != HoverAction.Promote) return;
+        _hoverPreviewActive = false;
+        _hoverTarget = null;
+        _gestureSnapshot = target;
+        _gestureSettings = _settings.Current;
+        if (DiagnosticsLog.Enabled) DiagnosticsLog.Write($"hover promote path={target.FolderPath}");
+        Apply(_state.PromoteToSticky());
     }
 
     private void ValidateOpenContext()
@@ -682,13 +710,19 @@ public partial class App : System.Windows.Application
         if (_startup is not null) _startup.Changed -= OnStartupRegistrationChanged;
         if (_theme is not null) { _theme.Changed -= OnThemeChanged; _theme.Dispose(); }
         if (_hook is not null) { _hook.Gesture -= OnHookGesture; _hook.Dispose(); }
+        if (_monitor is not null) _monitor.ExplorerContextChanged -= OnExplorerContextChanged;
         _monitor?.Dispose();
         _hoverResolver?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
         _trayIcon?.Dispose();
         _trayMenu?.Dispose();
         _trayMenuFont?.Dispose(); _trayTitleFont?.Dispose();
-        if (_preview is not null) { _preview.OpenRequested -= OpenSelectedAsync; _preview.CloseRequested -= CloseStickyPreview; }
+        if (_preview is not null)
+        {
+            _preview.OpenRequested -= OpenSelectedAsync;
+            _preview.CloseRequested -= CloseStickyPreview;
+            _preview.PromoteRequested -= PromoteHoverPreview;
+        }
         if (_singleInstance is not null) _singleInstance.ActivationRequested -= OnActivationRequested;
         _singleInstance?.Dispose();
         _mainWindow?.PrepareForExit(); _mainWindow?.Dispose();

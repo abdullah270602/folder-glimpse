@@ -2,13 +2,14 @@
 
 Hover is FolderGlimpse's pointer-first way to glimpse a folder without opening it or changing
 Explorer selection. It works alongside the configurable keyboard trigger rather than replacing
-it. Hover ships disabled until the user explicitly chooses one of two targeting modes:
+it. Any-folder hover is enabled by default on a fresh install. Users can choose between:
 
 - **Selected folder** — preview only when the pointer rests on the single selected folder. This is
   the conservative V1 mode and reuses the existing selection/focus proof.
 - **Any folder** — preview an unselected filesystem folder under the pointer. This V2 mode uses UI
   Automation only after dwell, then resolves the UIA display name through the active Explorer
   Shell view. UIA metadata is never treated as an authoritative filesystem path.
+- **Off** — stop pointer sampling entirely while retaining the configured keyboard trigger.
 
 ## User-visible behavior
 
@@ -16,10 +17,11 @@ it. Hover ships disabled until the user explicitly chooses one of two targeting 
 2. The pointer must remain within the configured movement tolerance for the configured dwell time.
 3. FolderGlimpse appears beside the item without activating or changing Explorer selection.
 4. The preview stays open while the pointer is over the source item or the preview.
-5. Double-clicking a child item opens it through the normal Windows shell without activating the
-   glimpse for keyboard input. Selection, keyboard navigation, and context actions remain sticky-only.
-6. It closes after the configured exit delay when the pointer leaves both regions.
-7. Moving to another folder starts a new dwell; the old preview cannot publish over the new target.
+5. Clicking a child item once deliberately promotes the visible popup into sticky interactive mode
+   without closing or re-enumerating it.
+6. A following second click retains normal double-click activation behavior and opens the exact item.
+7. It closes after the configured exit delay when the pointer leaves both regions.
+8. Moving to another folder starts a new dwell; the old preview cannot publish over the new target.
 
 Settings are independent and persistent:
 
@@ -81,16 +83,16 @@ Performance budgets for Release builds:
 - resolution rate is bounded by the configured dwell delay even during adversarial movement;
 - no folder enumeration and no thumbnail extraction in the hover detector;
 - existing cancellable background folder inspection and icon cache behavior remain unchanged;
-- idle hover-disabled cost is zero (timer stopped and worker asleep).
+- high-frequency pointer sampling is stopped whenever Explorer is not foreground or hover is off.
 
 ## Pointer interaction
 
-Hover and sticky previews use separate interaction modes. Hover enables hit-testing only for row
-double-click activation and retains `WS_EX_NOACTIVATE`; it never selects rows, accepts keyboard
-input, shows selection checkboxes, or opens context menus. A double-click passes the exact row entry
-to the shared activation service, closes the hover glimpse after a successful request, and preserves
-the file/folder activation settings. Momentary previews remain fully view-only. Sticky previews keep
-the complete selection, keyboard, Open button, and context-action behavior.
+Hover and sticky previews use separate interaction modes. Hover starts with `WS_EX_NOACTIVATE`, so
+merely moving into the popup never changes keyboard focus or Explorer selection. A deliberate first
+row click promotes that same popup to sticky mode without re-enumerating the folder and selects the
+clicked row. The second click in a double-click then follows the normal file/folder activation
+settings. Momentary previews remain fully view-only. Sticky previews provide selection, keyboard,
+the Open button, and context actions.
 
 ## State model
 
@@ -103,6 +105,8 @@ the pointer rests on a file, blank area, or unsupported Explorer surface.
 - movement outside tolerance restarts `Dwelling`;
 - an obsolete resolver completion is ignored by generation;
 - returning to source/preview during `ClosingGrace` restores `Open` without reloading;
+- a deliberate row click promotes `Open` or `ClosingGrace` into the keyboard sticky state without
+  closing or reloading the popup;
 - any unsafe context transition goes directly to `Idle` and closes;
 - keyboard preview ownership always preempts hover ownership.
 

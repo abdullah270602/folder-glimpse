@@ -15,6 +15,7 @@ public enum PeekAction
 {
     None,
     OpenSticky,
+    PromoteSticky,
     OpenMomentary,
     Close
 }
@@ -59,6 +60,17 @@ public sealed class PeekStateMachine
 
         State = PeekState.MomentaryOpen;
         return Result(true, PeekAction.OpenMomentary);
+    }
+
+    public StateTransition PromoteToSticky()
+    {
+        if (State != PeekState.Idle)
+        {
+            return Result(false);
+        }
+
+        State = PeekState.StickyOpen;
+        return Result(false, PeekAction.PromoteSticky);
     }
 
     public StateTransition SpaceUp()

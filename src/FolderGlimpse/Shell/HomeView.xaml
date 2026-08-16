@@ -17,11 +17,11 @@
       </Border>
       <TextBlock Text="Quick Start" Style="{StaticResource SectionTitleStyle}" Margin="0,24,0,8"/>
       <Border Style="{StaticResource SettingsCardStyle}" Padding="18,16">
-        <StackPanel><TextBlock Text="1   Open File Explorer"/><TextBlock Text="2   Select a folder" Margin="0,9,0,0"/><TextBlock Margin="0,9,0,0"><Run Text="3   Press "/><Run Text="{Binding ShortcutText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource BrandBlueBrush}"/></TextBlock></StackPanel>
+        <StackPanel><TextBlock Text="1   Open File Explorer"/><TextBlock Text="2   Rest the pointer over a folder" Margin="0,9,0,0"/><TextBlock Margin="0,9,0,0"><Run Text="3   Or tap or hold "/><Run Text="{Binding ShortcutText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource BrandBlueBrush}"/></TextBlock></StackPanel>
       </Border>
       <Grid Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <Border Style="{StaticResource SettingsCardStyle}" Padding="16,14"><StackPanel><TextBlock Text="{Binding TapTitle}" FontWeight="SemiBold"/><TextBlock Text="{Binding TapDescription}" Margin="0,5,0,0" Foreground="{DynamicResource SubtleTextBrush}"/></StackPanel></Border>
-        <Border Grid.Column="2" Style="{StaticResource SettingsCardStyle}" Padding="16,14"><StackPanel><TextBlock Text="{Binding HoldTitle}" FontWeight="SemiBold"/><TextBlock Text="Preview while held" Margin="0,5,0,0" Foreground="{DynamicResource SubtleTextBrush}"/></StackPanel></Border>
+        <Border Style="{StaticResource SettingsCardStyle}" Padding="16,14"><StackPanel><TextBlock Text="Hover" FontWeight="SemiBold"/><TextBlock Text="On by default for any folder; fully adjustable in Settings" Margin="0,5,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"/></StackPanel></Border>
+        <Border Grid.Column="2" Style="{StaticResource SettingsCardStyle}" Padding="16,14"><StackPanel><TextBlock Text="Keyboard" FontWeight="SemiBold"/><TextBlock Margin="0,5,0,0" Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap"><Run Text="Tap or hold "/><Run Text="{Binding ShortcutText, Mode=OneWay}" FontWeight="SemiBold"/><Run Text=" when you prefer a shortcut"/></TextBlock></StackPanel></Border>
       </Grid>
     </StackPanel>
   </ScrollViewer>
