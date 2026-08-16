@@ -93,6 +93,7 @@ public partial class PreviewWindow : Window
     internal void ConfigureInteraction(PreviewInteractionMode mode, FolderGlimpseSettings settings)
     {
         _settings = settings;
+        ApplyPresentation(settings);
         _interactionMode = settings.InteractiveItems ? mode : PreviewInteractionMode.ViewOnly;
         var selectable = ItemActionPolicy.CanSelect(_interactionMode, settings);
         ViewModel.ShowCheckboxes = selectable && settings.MultiSelection && settings.ShowSelectionCheckboxes;
@@ -111,6 +112,19 @@ public partial class PreviewWindow : Window
         if (needsSelectionRefresh) RefreshSelection();
         else ViewModel.SelectedCount = 0;
         SetInteractiveStyle(selectable);
+    }
+
+    private void ApplyPresentation(FolderGlimpseSettings settings)
+    {
+        var showHeader = settings.HeaderStyle != PopupHeaderStyle.Hidden;
+        HeaderPanel.Visibility = HeaderDivider.Visibility = showHeader ? Visibility.Visible : Visibility.Collapsed;
+        HeaderPanel.Margin = settings.HeaderStyle == PopupHeaderStyle.Compact
+            ? new Thickness(18, 11, 18, 10)
+            : new Thickness(18, 15, 18, 13);
+        ViewModel.ShowPath = settings.HeaderStyle == PopupHeaderStyle.Full && settings.ShowFullPath;
+        FolderPathText.Visibility = ViewModel.PathVisibility;
+        ViewModel.FooterStyle = settings.FooterStyle;
+        ViewModel.ShowEntryIcons = settings.ShowEntryIcons;
     }
 
     internal bool TryPromoteEntry(int index)
@@ -158,7 +172,9 @@ public partial class PreviewWindow : Window
         Width = settings.PopupWidth;
         MaxHeight = settings.MaxPopupHeight;
         EntryList.Tag = settings.PreviewRowHeightDip;
-        EntryList.MaxHeight = (settings.PreviewVisibleRows * settings.PreviewRowHeightDip) + EntryList.Padding.Top + EntryList.Padding.Bottom;
+        EntryList.MaxHeight = settings.PreviewVisibleRows == 0
+            ? double.PositiveInfinity
+            : (settings.PreviewVisibleRows * settings.PreviewRowHeightDip) + EntryList.Padding.Top + EntryList.Padding.Bottom;
         SizeToContent = SizeToContent.Manual;
         Show();
         Reposition();
@@ -167,7 +183,7 @@ public partial class PreviewWindow : Window
     private void Reposition()
     {
         var desiredHeight = DesiredWindowHeight();
-        var needsScroll = ViewModel.Entries.Count > _settings.PreviewVisibleRows || desiredHeight > MaxHeight;
+        var needsScroll = (_settings.PreviewVisibleRows > 0 && ViewModel.Entries.Count > _settings.PreviewVisibleRows) || desiredHeight > MaxHeight;
         ScrollViewer.SetVerticalScrollBarVisibility(EntryList, needsScroll ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden);
         Height = Math.Min(Math.Max(desiredHeight, MinHeight), MaxHeight);
         UpdateLayout();
@@ -179,7 +195,7 @@ public partial class PreviewWindow : Window
         if (dpi == 0) dpi = 96;
         var popupSize = new PixelSize((int)Math.Ceiling(Width * dpi / 96d), (int)Math.Ceiling(Height * dpi / 96d));
         var work = new PixelRect(info.Work.Left, info.Work.Top, info.Work.Right, info.Work.Bottom);
-        var placed = PopupPositioner.Place(_lastAnchor, work, popupSize);
+        var placed = PopupPositioner.Place(_lastAnchor, work, popupSize, _settings.PlacementPreference);
         var stickyInteractive = ItemActionPolicy.CanSelect(_interactionMode, _settings);
         var flags = NativeMethods.SwpShowWindow | (stickyInteractive ? 0u : NativeMethods.SwpNoActivate);
         NativeMethods.SetWindowPos(_handle, _detached ? NativeMethods.HwndNotTopmost : NativeMethods.HwndTopmost, placed.Left, placed.Top, placed.Width, placed.Height, flags);
@@ -211,10 +227,18 @@ public partial class PreviewWindow : Window
 
     private double DesiredWindowHeight()
     {
-        var visibleRows = Math.Max(1, Math.Min(ViewModel.Entries.Count, _settings.PreviewVisibleRows));
+        var rowLimit = _settings.PreviewVisibleRows == 0 ? int.MaxValue : _settings.PreviewVisibleRows;
+        var visibleRows = Math.Max(1, Math.Min(ViewModel.Entries.Count, rowLimit));
         var list = (visibleRows * _settings.PreviewRowHeightDip) + EntryList.Padding.Top + EntryList.Padding.Bottom;
         var actionBar = ViewModel.SelectedCount > 1 ? 48d : 0d;
-        return 64d + list + 39d + actionBar + (actionBar > 0 ? 3d : 2d);
+        var header = _settings.HeaderStyle switch
+        {
+            PopupHeaderStyle.Hidden => 0d,
+            PopupHeaderStyle.Compact => 47d,
+            _ => 64d
+        };
+        var footer = ViewModel.FooterVisibility == Visibility.Visible ? 39d : 0d;
+        return header + list + footer + actionBar + (actionBar > 0 ? 3d : 2d);
     }
 
     private void EntryListMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -331,6 +355,7 @@ public partial class PreviewWindow : Window
 
     private async Task ExecuteActionAsync(ItemAction action, IReadOnlyList<FolderEntry> selected)
     {
+        ViewModel.ErrorMessage = string.Empty;
         try
         {
             switch (action)
@@ -342,7 +367,7 @@ public partial class PreviewWindow : Window
                 case ItemAction.Properties: await _launcher.ShowPropertiesAsync(selected[0].FullPath); break;
             }
         }
-        catch (Exception exception) { ViewModel.Status = SafeError(exception); }
+        catch (Exception exception) { ViewModel.ErrorMessage = SafeError(exception); }
     }
 
     private IReadOnlyList<FolderEntry> SelectedEntries() => _selection.SelectedIndices

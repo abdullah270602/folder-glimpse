@@ -27,6 +27,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Safe item activation", TestActivation),
     ("Preview interaction routing", TestPreviewInteractionRouting),
     ("Context action policy", TestContextActions),
+    ("Popup customization presets", TestPopupCustomization),
     ("Popup positioning", TestPositioning)
 };
 
@@ -447,6 +448,10 @@ static Task TestSettings()
         service.Load();
         True(File.Exists(path), "missing settings file is created");
         Equal(430d, service.Current.PopupWidth, "defaults loaded");
+        Equal(PopupHeaderStyle.Full, service.Current.HeaderStyle, "legacy appearance keeps the full header");
+        Equal(PopupFooterStyle.Always, service.Current.FooterStyle, "legacy appearance keeps the count footer");
+        True(service.Current.ShowEntryIcons, "entry icons default on");
+        Equal(PopupPlacementPreference.Auto, service.Current.PlacementPreference, "placement defaults to automatic");
         True(service.Current.InteractiveItems, "interaction defaults on");
         True(service.Current.DoubleClickFilesToOpen && service.Current.DoubleClickFoldersToOpen, "double-click defaults on");
         True(service.Current.RightClickActions && service.Current.MultiSelection, "selection actions default on");
@@ -461,6 +466,8 @@ static Task TestSettings()
         Equal(HoverModifier.None, service.Current.HoverModifier, "hover requires no modifier by default");
         Equal(MouseTriggerOptions.None, service.Current.MouseTriggers, "mouse shortcuts are opt-in by default");
         True(service.TryUpdate(s => s with { Theme = ThemePreference.Dark, PopupWidth = 612, InitialItemLimit = 100,
+            HeaderStyle = PopupHeaderStyle.Hidden, FooterStyle = PopupFooterStyle.Smart, ShowEntryIcons = false,
+            PreviewVisibleRows = 15, PlacementPreference = PopupPlacementPreference.Above,
             HoverMode = HoverPreviewMode.AnyFolder, HoverModifier = HoverModifier.Control,
             MouseTriggers = MouseTriggerOptions.MiddleClick | MouseTriggerOptions.ControlRightClick,
             HoverOpenDelayMs = 900, HoverCloseDelayMs = 400, HoverMovementTolerancePx = 10,
@@ -470,6 +477,11 @@ static Task TestSettings()
         var reloaded = new JsonSettingsService(path); reloaded.Load();
         Equal(ThemePreference.Dark, reloaded.Current.Theme, "enum round trips");
         Equal(612d, reloaded.Current.PopupWidth, "number round trips");
+        Equal(PopupHeaderStyle.Hidden, reloaded.Current.HeaderStyle, "header style round trips");
+        Equal(PopupFooterStyle.Smart, reloaded.Current.FooterStyle, "footer style round trips");
+        False(reloaded.Current.ShowEntryIcons, "icon visibility round trips");
+        Equal(15, reloaded.Current.PreviewVisibleRows, "visible rows round trip");
+        Equal(PopupPlacementPreference.Above, reloaded.Current.PlacementPreference, "placement round trips");
         True(reloaded.Current.ShowSelectionCheckboxes, "interaction boolean round trips");
         False(reloaded.Current.AllowOpeningMultipleItems, "multi-open setting round trips");
         Equal(12, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold round trips");
@@ -499,6 +511,8 @@ static Task TestSettings()
             HoverOpenDelayMs = 1, HoverCloseDelayMs = 9000, HoverMovementTolerancePx = 100,
             HoverMode = (HoverPreviewMode)999, HoverModifier = (HoverModifier)999,
             MouseTriggers = (MouseTriggerOptions)128,
+            HeaderStyle = (PopupHeaderStyle)999, FooterStyle = (PopupFooterStyle)999,
+            PreviewVisibleRows = 12, PlacementPreference = (PopupPlacementPreference)999,
             ConfirmBeforeOpeningMoreThan = 500 }, out _), "invalid values normalize");
         Equal(700d, reloaded.Current.PopupWidth, "width clamps high");
         Equal(100, reloaded.Current.HoldThresholdMs, "hold delay clamps low");
@@ -510,6 +524,10 @@ static Task TestSettings()
         Equal(HoverPreviewMode.AnyFolder, reloaded.Current.HoverMode, "invalid hover mode falls back to the product default");
         Equal(HoverModifier.None, reloaded.Current.HoverModifier, "invalid hover modifier fails to none");
         Equal(MouseTriggerOptions.None, reloaded.Current.MouseTriggers, "unknown mouse trigger flags fail open to none");
+        Equal(PopupHeaderStyle.Full, reloaded.Current.HeaderStyle, "invalid header style returns to full");
+        Equal(PopupFooterStyle.Always, reloaded.Current.FooterStyle, "invalid footer style returns to always");
+        Equal(10, reloaded.Current.PreviewVisibleRows, "unsupported visible row count resets");
+        Equal(PopupPlacementPreference.Auto, reloaded.Current.PlacementPreference, "invalid placement returns to auto");
         True(reloaded.TryUpdate(s => s with { ConfirmBeforeOpeningMoreThan = 1 }, out _), "low confirmation threshold normalizes");
         Equal(2, reloaded.Current.ConfirmBeforeOpeningMoreThan, "confirmation threshold clamps low");
     }
@@ -843,6 +861,63 @@ static Task TestPositioning()
     var tiny = PopupPositioner.Place(new PixelRect(20, 20, 30, 30), new PixelRect(0, 0, 300, 200), new PixelSize(500, 600));
     Equal(300, tiny.Width, "oversized popup shrinks to work width");
     Equal(200, tiny.Height, "oversized popup shrinks to work height");
+    var anchor = new PixelRect(800, 400, 900, 500);
+    Equal(910, PopupPositioner.Place(anchor, work, new PixelSize(300, 200), PopupPlacementPreference.Right).Left, "right preference is honored");
+    Equal(490, PopupPositioner.Place(anchor, work, new PixelSize(300, 200), PopupPlacementPreference.Left).Left, "left preference is honored");
+    Equal(510, PopupPositioner.Place(anchor, work, new PixelSize(300, 200), PopupPlacementPreference.Below).Top, "below preference is honored");
+    Equal(190, PopupPositioner.Place(anchor, work, new PixelSize(300, 200), PopupPlacementPreference.Above).Top, "above preference is honored");
+
+    var random = new Random(1977);
+    for (var index = 0; index < 500; index++)
+    {
+        var workLeft = random.Next(-4000, 1000);
+        var workTop = random.Next(-2500, 1000);
+        var randomWork = new PixelRect(workLeft, workTop, workLeft + random.Next(200, 2500), workTop + random.Next(150, 1600));
+        var randomAnchor = new PixelRect(random.Next(randomWork.Left, randomWork.Right), random.Next(randomWork.Top, randomWork.Bottom), randomWork.Right, randomWork.Bottom);
+        randomAnchor = new PixelRect(randomAnchor.Left, randomAnchor.Top,
+            Math.Min(randomWork.Right, randomAnchor.Left + random.Next(1, 300)),
+            Math.Min(randomWork.Bottom, randomAnchor.Top + random.Next(1, 150)));
+        foreach (var preference in Enum.GetValues<PopupPlacementPreference>())
+        {
+            var placed = PopupPositioner.Place(randomAnchor, randomWork,
+                new PixelSize(random.Next(1, 3000), random.Next(1, 2000)), preference);
+            True(placed.Left >= randomWork.Left && placed.Right <= randomWork.Right &&
+                placed.Top >= randomWork.Top && placed.Bottom <= randomWork.Bottom,
+                $"random {preference} placement remains in signed work area");
+        }
+    }
+    return Task.CompletedTask;
+}
+
+static Task TestPopupCustomization()
+{
+    var original = FolderGlimpseSettings.Default with
+    {
+        PopupWidth = 555,
+        MaxPopupHeight = 777,
+        PlacementPreference = PopupPlacementPreference.Below
+    };
+    var minimal = PopupCustomization.ApplyPreset(original, PopupLayoutPreset.Minimal);
+    Equal(PopupHeaderStyle.Hidden, minimal.HeaderStyle, "minimal hides header");
+    Equal(PopupFooterStyle.Hidden, minimal.FooterStyle, "minimal hides footer");
+    False(minimal.ShowEntryIcons, "minimal disables icons");
+    False(PopupCustomization.ShouldLoadEntryIcons(minimal), "minimal bypasses shell icon loading");
+    Equal(8, minimal.PreviewVisibleRows, "minimal uses eight compact rows");
+    Equal(PopupLayoutPreset.Minimal, PopupCustomization.DetectPreset(minimal), "minimal is detected");
+    Equal(555d, minimal.PopupWidth, "preset preserves width");
+    Equal(777d, minimal.MaxPopupHeight, "preset preserves height");
+    Equal(PopupPlacementPreference.Below, minimal.PlacementPreference, "preset preserves placement");
+
+    var balanced = PopupCustomization.ApplyPreset(original, PopupLayoutPreset.Balanced);
+    Equal(PopupLayoutPreset.Balanced, PopupCustomization.DetectPreset(balanced), "balanced is detected");
+    Equal(PopupHeaderStyle.Compact, balanced.HeaderStyle, "balanced uses compact header");
+    Equal(PopupFooterStyle.Smart, balanced.FooterStyle, "balanced uses smart footer");
+
+    var detailed = PopupCustomization.ApplyPreset(original, PopupLayoutPreset.Detailed);
+    True(PopupCustomization.ShouldLoadEntryIcons(detailed), "detailed retains shell icon loading");
+    Equal(PopupLayoutPreset.Detailed, PopupCustomization.DetectPreset(detailed), "detailed is detected");
+    True(detailed.ShowModifiedDate && detailed.ShowFullPath, "detailed enables metadata");
+    Equal(PopupLayoutPreset.Custom, PopupCustomization.DetectPreset(detailed with { PreviewVisibleRows = 5 }), "individual edits report custom");
     return Task.CompletedTask;
 }
 

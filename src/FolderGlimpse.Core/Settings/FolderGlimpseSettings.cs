@@ -23,6 +23,18 @@ public enum HoverPreviewMode { Off, SelectedFolder, AnyFolder }
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum HoverModifier { None, Control, Shift }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PopupHeaderStyle { Full, Compact, Hidden }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PopupFooterStyle { Smart, Always, Hidden }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PopupPlacementPreference { Auto, Right, Left, Below, Above }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PopupLayoutPreset { Custom, Minimal, Balanced, Detailed }
+
 [Flags]
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum MouseTriggerOptions { None = 0, MiddleClick = 1, ControlLeftClick = 2, ControlRightClick = 4 }
@@ -32,6 +44,12 @@ public sealed record FolderGlimpseSettings
     public ThemePreference Theme { get; init; } = ThemePreference.System;
     public double PopupWidth { get; init; } = 430;
     public double MaxPopupHeight { get; init; } = 620;
+    public PopupHeaderStyle HeaderStyle { get; init; } = PopupHeaderStyle.Full;
+    public PopupFooterStyle FooterStyle { get; init; } = PopupFooterStyle.Always;
+    public bool ShowEntryIcons { get; init; } = true;
+    // 0 means Auto. Other accepted values are the choices exposed in Settings.
+    public int PreviewVisibleRows { get; init; } = 10;
+    public PopupPlacementPreference PlacementPreference { get; init; } = PopupPlacementPreference.Auto;
     public bool ShowFullPath { get; init; } = true;
     public bool ShowFileSize { get; init; } = true;
     public bool ShowModifiedDate { get; init; }
@@ -67,7 +85,6 @@ public sealed record FolderGlimpseSettings
     [JsonIgnore] public TimeSpan SnapshotMaxAge => TimeSpan.FromMilliseconds(3500);
     [JsonIgnore] public TimeSpan HoverOpenDelay => TimeSpan.FromMilliseconds(HoverOpenDelayMs);
     [JsonIgnore] public TimeSpan HoverCloseDelay => TimeSpan.FromMilliseconds(HoverCloseDelayMs);
-    [JsonIgnore] public int PreviewVisibleRows => 10;
     [JsonIgnore] public double PreviewRowHeightDip => Density == DisplayDensity.Compact ? 27 : 32;
 
     public static FolderGlimpseSettings Default => new();
@@ -75,6 +92,7 @@ public sealed record FolderGlimpseSettings
     public FolderGlimpseSettings Normalize()
     {
         var validLimits = InitialItemLimit is 0 or 20 or 50 or 100 or 200;
+        var validVisibleRows = PreviewVisibleRows is 0 or 5 or 8 or 10 or 15;
         const MouseTriggerOptions validMouseTriggers = MouseTriggerOptions.MiddleClick |
             MouseTriggerOptions.ControlLeftClick | MouseTriggerOptions.ControlRightClick;
         return this with
@@ -82,6 +100,10 @@ public sealed record FolderGlimpseSettings
             Theme = Enum.IsDefined(Theme) ? Theme : ThemePreference.System,
             PopupWidth = Math.Clamp(double.IsFinite(PopupWidth) ? PopupWidth : 430, 300, 700),
             MaxPopupHeight = Math.Clamp(double.IsFinite(MaxPopupHeight) ? MaxPopupHeight : 620, 250, 900),
+            HeaderStyle = Enum.IsDefined(HeaderStyle) ? HeaderStyle : PopupHeaderStyle.Full,
+            FooterStyle = Enum.IsDefined(FooterStyle) ? FooterStyle : PopupFooterStyle.Always,
+            PreviewVisibleRows = validVisibleRows ? PreviewVisibleRows : 10,
+            PlacementPreference = Enum.IsDefined(PlacementPreference) ? PlacementPreference : PopupPlacementPreference.Auto,
             SortMode = Enum.IsDefined(SortMode) ? SortMode : SortMode.Name,
             InitialItemLimit = validLimits ? InitialItemLimit : 50,
             Density = Enum.IsDefined(Density) ? Density : DisplayDensity.Comfortable,

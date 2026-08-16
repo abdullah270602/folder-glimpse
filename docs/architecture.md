@@ -123,8 +123,17 @@ attaches only the WPF and current foreground input queues, sets focus, and detac
 
 `AllowsTransparency` is avoided so DWM can provide reliable shadowing and rounded
 corners. Placement converts the WPF desired DIP size once using the target DPI, then
-does side selection and clamping entirely in physical pixels. Negative monitor origins
+tries the configured Auto/Right/Left/Below/Above order and clamps entirely in physical pixels.
+Explicit side preferences fall back to the opposite side and then the orthogonal sides when the
+preferred edge has insufficient room. Negative monitor origins
 and taskbars on any edge are supported through `MonitorFromRect` and `GetMonitorInfo`.
+
+Popup presentation is driven by one normalized immutable settings snapshot. Full, Compact, and
+Hidden header modes and Smart, Always, and Hidden footer modes collapse their WPF rows and
+dividers rather than leaving blank chrome. Smart footers surface only truncation notices. Read
+errors live in the list body, so they remain visible in every layout. Presets transform the same
+underlying settings fields and are detected from those values; they are not a parallel source of
+truth. Disabling entry icons also bypasses asynchronous shell icon extraction.
 
 Settings and Preview consume one application-level WPF resource dictionary. It defines
 the typography, cards, buttons, toggle switches, combo boxes, sliders, focus states, and

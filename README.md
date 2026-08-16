@@ -40,6 +40,8 @@ mouse shortcuts can open a sticky glimpse with middle-click, Ctrl+left-click, or
 - **Open files and folders** directly from an interactive sticky preview
 - **Multi-select and context actions** with familiar Windows interactions
 - **System, light, and dark themes** with mixed-DPI monitor support
+- **Customizable popup layouts** with Full, Compact, or Hidden headers; Smart or Hidden footers;
+  optional item icons; 5/8/10/15/Auto rows; and preferred placement
 - **Compact control center** for settings, help, startup behavior, and app status
 - **Consistent Windows 11 styling** with purpose-built application and tray icons
 - **Quiet tray operation** with centered actions, enable/disable, settings, startup, and exit
@@ -152,6 +154,18 @@ In an interactive sticky preview:
 - Use <kbd>Ctrl</kbd> or <kbd>Shift</kbd> for multiple selection.
 - Press <kbd>Enter</kbd> to open selected items.
 - Right-click for safe actions such as Open, Copy path, Open file location, and Properties.
+
+### Customize the popup
+
+Open **Settings → Popup layout** to control how much chrome and metadata the glimpse uses.
+Choose **Minimal**, **Balanced**, or **Detailed** as a starting point, then adjust individual
+options. Header and footer can be hidden independently, item icons can be disabled (which also
+skips their shell-loading work), and the list can show 5, 8, 10, 15, or an automatic number of
+rows. Preferred placement supports Auto, Right, Left, Below, and Above, with safe fallback when
+the chosen side has insufficient space.
+
+Read errors always remain visible in the popup body, even in a Minimal layout. Existing users keep
+the original Full-header, Always-footer appearance unless they change these options.
 
 Closing the control-center window does not exit FolderGlimpse; it continues running in
 the notification area. The tray menu provides **Open FolderGlimpse**, **Enabled**, **Settings…**,

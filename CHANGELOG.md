@@ -5,6 +5,8 @@ All notable FolderGlimpse changes will be documented here. The project follows
 
 ## Unreleased
 
+## [0.1.0-beta.3] - 2026-08-16
+
 ### Added
 
 - Added opt-in middle-click, exact Ctrl+left-click, and exact Ctrl+right-click shortcuts for opening
@@ -13,6 +15,20 @@ All notable FolderGlimpse changes will be documented here. The project follows
   opens the release page without downloading or executing an update.
 - Updated first-run guidance to teach hover and click-to-pin before the keyboard alternative.
 - Added a privacy-safe Copy diagnostics action for support reports, excluding user and folder paths.
+- Added Full, Compact, and Hidden popup headers plus Smart, Always, and Hidden footers.
+- Added Minimal, Balanced, and Detailed popup layout presets, optional item icons, configurable
+  5/8/10/15/Auto visible rows, and Auto/Right/Left/Below/Above placement preferences.
+
+### Changed
+
+- Hiding entry icons now skips shell icon extraction instead of only removing the icon column.
+- Popup placement now evaluates all four sides in signed physical pixels and safely falls back
+  inside the monitor work area.
+
+### Fixed
+
+- Folder read failures remain visible in the popup body when the footer is Smart or Hidden and no
+  longer appear together with the empty-folder state.
 
 ### Security
 

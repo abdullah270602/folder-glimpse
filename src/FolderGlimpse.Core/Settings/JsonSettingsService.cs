@@ -73,6 +73,11 @@ public sealed class JsonSettingsService : ISettingsService
             Theme = document.Theme ?? defaults.Theme,
             PopupWidth = document.PopupWidth ?? defaults.PopupWidth,
             MaxPopupHeight = document.MaxPopupHeight ?? defaults.MaxPopupHeight,
+            HeaderStyle = document.HeaderStyle ?? defaults.HeaderStyle,
+            FooterStyle = document.FooterStyle ?? defaults.FooterStyle,
+            ShowEntryIcons = document.ShowEntryIcons ?? defaults.ShowEntryIcons,
+            PreviewVisibleRows = document.PreviewVisibleRows ?? defaults.PreviewVisibleRows,
+            PlacementPreference = document.PlacementPreference ?? defaults.PlacementPreference,
             ShowFullPath = document.ShowFullPath ?? defaults.ShowFullPath,
             ShowFileSize = document.ShowFileSize ?? defaults.ShowFileSize,
             ShowModifiedDate = document.ShowModifiedDate ?? defaults.ShowModifiedDate,
@@ -138,6 +143,11 @@ public sealed class JsonSettingsService : ISettingsService
         public ThemePreference? Theme { get; set; }
         public double? PopupWidth { get; set; }
         public double? MaxPopupHeight { get; set; }
+        public PopupHeaderStyle? HeaderStyle { get; set; }
+        public PopupFooterStyle? FooterStyle { get; set; }
+        public bool? ShowEntryIcons { get; set; }
+        public int? PreviewVisibleRows { get; set; }
+        public PopupPlacementPreference? PlacementPreference { get; set; }
         public bool? ShowFullPath { get; set; }
         public bool? ShowFileSize { get; set; }
         public bool? ShowModifiedDate { get; set; }

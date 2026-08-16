@@ -166,6 +166,18 @@ folders and opens nothing automatically.
       should remain negligible.
 - [ ] Verify 20/50/100/200/All limits, hidden-file filtering, all sort modes, folders-first,
       compact/comfortable density, path/size/date visibility, width, and height.
+- [ ] Verify Full, Compact, and Hidden headers collapse correctly; the full-path control only
+      affects Full; and no blank header/divider remains in Hidden mode.
+- [ ] Verify Always shows ordinary item counts, Smart hides ordinary counts but shows a truncated
+      result notice, and Hidden removes the footer/divider. Force an unreadable folder in each mode
+      and verify the body error remains visible without an empty-folder message.
+- [ ] Verify Minimal, Balanced, and Detailed presets, then change one preset field and confirm the
+      selector reports Custom. Confirm presets preserve width, height, theme, and preferred side.
+- [ ] Turn item icons off and verify the icon column collapses without a name-alignment gap. Check
+      5, 8, 10, 15, and Auto rows against short and 500-item folders.
+- [ ] Test Auto, Right, Left, Below, and Above near every monitor edge, including negative monitor
+      coordinates and mixed DPI. Verify the preferred side is used when it fits and fallback stays
+      fully inside the work area.
 - [ ] Toggle **Launch at startup** from both Settings and tray; verify synchronized state and
       the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry, then disable it.
 - [ ] Replace settings.json with empty, partial, malformed, and out-of-range content; verify

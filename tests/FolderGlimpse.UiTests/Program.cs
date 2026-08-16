@@ -23,6 +23,35 @@ internal static class Program
             window.ConfigureInteraction(PreviewInteractionMode.ViewOnly, defaults);
             False(window.EntryList.IsHitTestVisible, "view-only previews must ignore pointer input");
             False(window.EntryList.Focusable, "view-only previews must not take keyboard focus");
+            True(window.HeaderPanel.Visibility == System.Windows.Visibility.Visible, "full header is visible by default");
+            True(window.FolderPathText.Visibility == System.Windows.Visibility.Visible, "full header shows the configured path");
+            True(window.FooterText.Visibility == System.Windows.Visibility.Visible, "always footer is visible by default");
+
+            window.ConfigureInteraction(PreviewInteractionMode.ViewOnly, defaults with
+            {
+                HeaderStyle = PopupHeaderStyle.Compact,
+                FooterStyle = PopupFooterStyle.Smart,
+                ShowEntryIcons = false
+            });
+            True(window.HeaderPanel.Visibility == System.Windows.Visibility.Visible, "compact header retains folder identity");
+            True(window.FolderPathText.Visibility == System.Windows.Visibility.Collapsed, "compact header removes the path");
+            True(window.ViewModel.FooterVisibility == System.Windows.Visibility.Collapsed, "smart footer hides ordinary counts");
+            False(window.ViewModel.ShowEntryIcons, "hidden icons propagate to the row presentation");
+            window.ViewModel.IsTruncated = true;
+            True(window.ViewModel.FooterVisibility == System.Windows.Visibility.Visible, "smart footer exposes truncation notices");
+
+            window.ConfigureInteraction(PreviewInteractionMode.ViewOnly, defaults with
+            {
+                HeaderStyle = PopupHeaderStyle.Hidden,
+                FooterStyle = PopupFooterStyle.Hidden
+            });
+            True(window.HeaderPanel.Visibility == System.Windows.Visibility.Collapsed &&
+                window.HeaderDivider.Visibility == System.Windows.Visibility.Collapsed, "hidden header removes its divider and chrome");
+            True(window.ViewModel.FooterVisibility == System.Windows.Visibility.Collapsed, "hidden footer removes its divider and chrome");
+            window.ViewModel.ErrorMessage = "Access is unavailable.";
+            True(window.ViewModel.ErrorVisibility == System.Windows.Visibility.Visible, "read errors stay visible without a footer");
+            True(window.ViewModel.EmptyVisibility == System.Windows.Visibility.Collapsed, "an error never also claims the folder is empty");
+            window.ViewModel.ErrorMessage = string.Empty;
 
             window.ConfigureInteraction(PreviewInteractionMode.HoverPointer, defaults);
             True(window.EntryList.IsHitTestVisible, "hover previews must receive file and folder double-clicks");
@@ -78,7 +107,7 @@ internal static class Program
                 mouseHook.SetEnabled(true);
             }
 
-            Console.WriteLine("12/12 WPF, update, and native hook checks passed");
+            Console.WriteLine("24/24 WPF, update, and native hook checks passed");
             return 0;
         }
         catch (Exception exception)

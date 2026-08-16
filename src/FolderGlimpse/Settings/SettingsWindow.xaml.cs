@@ -20,6 +20,11 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         _settings = settings; _startup = startup;
         InitializeComponent();
         ThemeBox.ItemsSource = new[] { new Choice<ThemePreference>("Use Windows setting", ThemePreference.System), new("Light", ThemePreference.Light), new("Dark", ThemePreference.Dark) };
+        PresetBox.ItemsSource = new[] { new Choice<PopupLayoutPreset>("Custom", PopupLayoutPreset.Custom), new("Minimal", PopupLayoutPreset.Minimal), new("Balanced", PopupLayoutPreset.Balanced), new("Detailed", PopupLayoutPreset.Detailed) };
+        HeaderStyleBox.ItemsSource = new[] { new Choice<PopupHeaderStyle>("Full", PopupHeaderStyle.Full), new("Compact", PopupHeaderStyle.Compact), new("Hidden", PopupHeaderStyle.Hidden) };
+        FooterStyleBox.ItemsSource = new[] { new Choice<PopupFooterStyle>("Smart", PopupFooterStyle.Smart), new("Always", PopupFooterStyle.Always), new("Hidden", PopupFooterStyle.Hidden) };
+        VisibleRowsBox.ItemsSource = new[] { new Choice<int>("Auto", 0), new("5 rows", 5), new("8 rows", 8), new("10 rows", 10), new("15 rows", 15) };
+        PlacementBox.ItemsSource = new[] { new Choice<PopupPlacementPreference>("Auto", PopupPlacementPreference.Auto), new("Right", PopupPlacementPreference.Right), new("Left", PopupPlacementPreference.Left), new("Below", PopupPlacementPreference.Below), new("Above", PopupPlacementPreference.Above) };
         DensityBox.ItemsSource = new[] { new Choice<DisplayDensity>("Comfortable", DisplayDensity.Comfortable), new("Compact", DisplayDensity.Compact) };
         SortBox.ItemsSource = new[] { new Choice<SortMode>("Name", SortMode.Name), new("Modified date", SortMode.ModifiedDate), new("File type", SortMode.Type) };
         HotkeyBox.ItemsSource = new[] { new Choice<TriggerHotkey>("Space", TriggerHotkey.Space), new("Ctrl + Space", TriggerHotkey.ControlSpace) };
@@ -61,6 +66,12 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         _loading = true;
         var s = _settings.Current;
         ThemeBox.SelectedItem = FindChoice(ThemeBox, s.Theme); WidthSlider.Value = s.PopupWidth; HeightSlider.Value = s.MaxPopupHeight;
+        PresetBox.SelectedItem = FindChoice(PresetBox, PopupCustomization.DetectPreset(s));
+        HeaderStyleBox.SelectedItem = FindChoice(HeaderStyleBox, s.HeaderStyle);
+        FooterStyleBox.SelectedItem = FindChoice(FooterStyleBox, s.FooterStyle);
+        EntryIconsCheck.IsChecked = s.ShowEntryIcons;
+        VisibleRowsBox.SelectedItem = FindChoice(VisibleRowsBox, s.PreviewVisibleRows);
+        PlacementBox.SelectedItem = FindChoice(PlacementBox, s.PlacementPreference);
         PathCheck.IsChecked = s.ShowFullPath; SizeCheck.IsChecked = s.ShowFileSize; DateCheck.IsChecked = s.ShowModifiedDate;
         HiddenCheck.IsChecked = s.ShowHiddenFiles; SortBox.SelectedItem = FindChoice(SortBox, s.SortMode); FoldersCheck.IsChecked = s.FoldersFirst;
         LimitBox.SelectedItem = FindChoice(LimitBox, s.InitialItemLimit);
@@ -95,6 +106,11 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         {
             Theme = (ThemeBox.SelectedItem as Choice<ThemePreference>)?.Value ?? s.Theme,
             PopupWidth = WidthSlider.Value, MaxPopupHeight = HeightSlider.Value,
+            HeaderStyle = (HeaderStyleBox.SelectedItem as Choice<PopupHeaderStyle>)?.Value ?? s.HeaderStyle,
+            FooterStyle = (FooterStyleBox.SelectedItem as Choice<PopupFooterStyle>)?.Value ?? s.FooterStyle,
+            ShowEntryIcons = EntryIconsCheck.IsChecked == true,
+            PreviewVisibleRows = (VisibleRowsBox.SelectedItem as Choice<int>)?.Value ?? s.PreviewVisibleRows,
+            PlacementPreference = (PlacementBox.SelectedItem as Choice<PopupPlacementPreference>)?.Value ?? s.PlacementPreference,
             ShowFullPath = PathCheck.IsChecked == true, ShowFileSize = SizeCheck.IsChecked == true,
             ShowModifiedDate = DateCheck.IsChecked == true, ShowHiddenFiles = HiddenCheck.IsChecked == true,
             SortMode = (SortBox.SelectedItem as Choice<SortMode>)?.Value ?? s.SortMode,
@@ -124,6 +140,14 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
         UpdateDependencies();
     }
 
+    private void PresetChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_loading || !IsLoaded || PresetBox.SelectedItem is not Choice<PopupLayoutPreset> choice || choice.Value == PopupLayoutPreset.Custom) return;
+        var saved = _settings.TryUpdate(s => PopupCustomization.ApplyPreset(s, choice.Value), out var error);
+        if (!saved) LoadValues();
+        ErrorText.Text = error ?? string.Empty;
+    }
+
     private void StartupChanged(object sender, RoutedEventArgs e)
     {
         if (_loading || !IsLoaded) return;
@@ -147,6 +171,7 @@ public partial class SettingsView : System.Windows.Controls.UserControl, IDispos
 
     private void UpdateDependencies()
     {
+        PathCheck.IsEnabled = (HeaderStyleBox.SelectedItem as Choice<PopupHeaderStyle>)?.Value == PopupHeaderStyle.Full;
         var interactive = InteractiveCheck.IsChecked == true;
         DoubleFileCard.IsEnabled = interactive; DoubleFolderCard.IsEnabled = interactive; RightClickCard.IsEnabled = interactive;
         MultiCard.IsEnabled = interactive; CloseAfterCard.IsEnabled = interactive;
