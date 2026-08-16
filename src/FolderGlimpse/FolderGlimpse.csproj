@@ -19,7 +19,7 @@
     <RepositoryUrl>https://github.com/abdullah270602/folder-glimpse</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>0.1.0-beta.2</Version>
+    <Version>0.1.0-beta.3</Version>
     <Copyright>Copyright © 2026 Abdullah Naseem</Copyright>
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>

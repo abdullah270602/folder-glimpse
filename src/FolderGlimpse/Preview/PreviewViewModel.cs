@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using FolderGlimpse.Core.FolderInspection;
+using FolderGlimpse.Core.Settings;
 
 namespace FolderGlimpse.Preview;
 
@@ -16,6 +17,10 @@ public sealed class PreviewViewModel : INotifyPropertyChanged
     private bool _showPath = true;
     private int _selectedCount;
     private bool _showCheckboxes;
+    private bool _showEntryIcons = true;
+    private string _errorMessage = string.Empty;
+    private bool _isTruncated;
+    private PopupFooterStyle _footerStyle = PopupFooterStyle.Always;
 
     public ObservableCollection<PreviewEntryViewModel> Entries { get; } = new();
     public string FolderName { get => _folderName; set => Set(ref _folderName, value); }
@@ -25,11 +30,18 @@ public sealed class PreviewViewModel : INotifyPropertyChanged
     public Visibility PathVisibility => ShowPath ? Visibility.Visible : Visibility.Collapsed;
     public bool Loading { get => _loading; set { if (Set(ref _loading, value)) { Changed(nameof(LoadingVisibility)); Changed(nameof(EmptyVisibility)); } } }
     public Visibility LoadingVisibility => Loading ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility EmptyVisibility => !Loading && Entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility EmptyVisibility => !Loading && string.IsNullOrWhiteSpace(ErrorMessage) && Entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     public int SelectedCount { get => _selectedCount; set { if (Set(ref _selectedCount, value)) { Changed(nameof(SelectionStatus)); Changed(nameof(ActionBarVisibility)); } } }
     public string SelectionStatus => $"{SelectedCount} selected";
     public Visibility ActionBarVisibility => SelectedCount > 1 ? Visibility.Visible : Visibility.Collapsed;
     public bool ShowCheckboxes { get => _showCheckboxes; set => Set(ref _showCheckboxes, value); }
+    public bool ShowEntryIcons { get => _showEntryIcons; set => Set(ref _showEntryIcons, value); }
+    public string ErrorMessage { get => _errorMessage; set { if (Set(ref _errorMessage, value)) { Changed(nameof(ErrorVisibility)); Changed(nameof(EmptyVisibility)); } } }
+    public Visibility ErrorVisibility => string.IsNullOrWhiteSpace(ErrorMessage) ? Visibility.Collapsed : Visibility.Visible;
+    public bool IsTruncated { get => _isTruncated; set { if (Set(ref _isTruncated, value)) Changed(nameof(FooterVisibility)); } }
+    public PopupFooterStyle FooterStyle { get => _footerStyle; set { if (Set(ref _footerStyle, value)) Changed(nameof(FooterVisibility)); } }
+    public Visibility FooterVisibility => FooterStyle == PopupFooterStyle.Always ||
+        (FooterStyle == PopupFooterStyle.Smart && IsTruncated) ? Visibility.Visible : Visibility.Collapsed;
 
     internal void EntriesChanged() => Changed(nameof(EmptyVisibility));
     public event PropertyChangedEventHandler? PropertyChanged;

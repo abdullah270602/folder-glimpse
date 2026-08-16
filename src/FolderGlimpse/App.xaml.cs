@@ -178,8 +178,10 @@ public partial class App : System.Windows.Application
         var captureSelection = !e.Args.Contains("--no-capture-selection", StringComparer.OrdinalIgnoreCase);
         var captureDelayText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-delay-ms=", StringComparison.OrdinalIgnoreCase))?["--capture-delay-ms=".Length..];
         var captureDelay = int.TryParse(captureDelayText, out var requestedDelay) ? Math.Clamp(requestedDelay, 250, 5000) : 900;
+        var capturePresetText = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-preset=", StringComparison.OrdinalIgnoreCase))?["--capture-preset=".Length..];
+        var capturePreset = Enum.TryParse<PopupLayoutPreset>(capturePresetText, true, out var parsedPreset) ? parsedPreset : PopupLayoutPreset.Custom;
         if (!string.IsNullOrWhiteSpace(previewCapture) && !string.IsNullOrWhiteSpace(previewFolder) && Directory.Exists(previewFolder))
-            _ = CapturePreviewAsync(previewFolder, previewCapture, captureInteractive, captureSelection, captureDelay);
+            _ = CapturePreviewAsync(previewFolder, previewCapture, captureInteractive, captureSelection, captureDelay, capturePreset);
         var trayCapture = e.Args.FirstOrDefault(argument => argument.StartsWith("--capture-tray=", StringComparison.OrdinalIgnoreCase))?["--capture-tray=".Length..];
         if (!string.IsNullOrWhiteSpace(trayCapture))
         {
@@ -300,8 +302,9 @@ public partial class App : System.Windows.Application
         var token = _previewLoad.Token;
         var vm = _preview.ViewModel;
         vm.FolderName = snapshot.DisplayName ?? Path.GetFileName(snapshot.FolderPath);
-        vm.FolderPath = snapshot.FolderPath; vm.ShowPath = settings.ShowFullPath;
-        _preview.ResetSelection(); vm.Entries.Clear(); vm.EntriesChanged(); vm.Loading = true; vm.Status = "Loading folder…";
+        vm.FolderPath = snapshot.FolderPath;
+        _preview.ResetSelection(); vm.Entries.Clear(); vm.EntriesChanged();
+        vm.ErrorMessage = string.Empty; vm.IsTruncated = false; vm.Loading = true; vm.Status = string.Empty;
         _preview.ApplyTheme(_theme!); _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, interactionMode);
 
         FolderContents contents;
@@ -317,20 +320,24 @@ public partial class App : System.Windows.Application
         foreach (var entry in contents.Entries)
             vm.Entries.Add(CreateEntry(entry, settings, null));
         vm.Loading = false; vm.EntriesChanged();
-        vm.Status = contents.Error ?? (contents.HasMore
+        vm.ErrorMessage = contents.Error ?? string.Empty;
+        vm.IsTruncated = contents.HasMore;
+        vm.Status = contents.HasMore
             ? $"{settings.InitialItemLimit}+ items · showing first {settings.InitialItemLimit}"
-            : $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}");
+            : $"{contents.Entries.Count} {(contents.Entries.Count == 1 ? "item" : "items")}";
         _preview.ShowBeside(snapshot.ItemBounds ?? CursorAnchor(), settings, interactionMode);
-        _ = LoadIconsAsync(contents, settings, generation, token);
+        if (PopupCustomization.ShouldLoadEntryIcons(settings)) _ = LoadIconsAsync(contents, settings, generation, token);
     }
 
-    private async Task CapturePreviewAsync(string folder, string output, bool interactive, bool captureSelection, int captureDelayMs)
+    private async Task CapturePreviewAsync(string folder, string output, bool interactive, bool captureSelection, int captureDelayMs,
+        PopupLayoutPreset capturePreset = PopupLayoutPreset.Custom)
     {
         var snapshot = new ExplorerSnapshot(true, "Capture", NativeMethods.GetForegroundWindow(), 0, 0, folder,
             Path.GetFileName(folder), CursorAnchor(), DateTimeOffset.UtcNow, 1);
         var captureSettings = interactive
             ? _settings!.Current with { InteractiveItems = true, MultiSelection = true, ShowSelectionCheckboxes = true }
             : _settings!.Current;
+        captureSettings = PopupCustomization.ApplyPreset(captureSettings, capturePreset);
         if (interactive)
         {
             _gestureSnapshot = snapshot;
@@ -640,6 +647,7 @@ public partial class App : System.Windows.Application
         var settings = _settings.Current;
         var options = new ActivationOptions(settings.InteractiveItems, settings.AllowOpeningMultipleItems, settings.ConfirmBeforeOpeningMoreThan);
         _activationInProgress = true;
+        _preview.ViewModel.ErrorMessage = string.Empty;
         try
         {
             if (DiagnosticsLog.Enabled)
@@ -647,7 +655,7 @@ public partial class App : System.Windows.Application
             var result = await _activation.OpenAsync(entries, options);
             if (DiagnosticsLog.Enabled)
                 DiagnosticsLog.Write($"activation completed requested={result.RequestedCount} cancelled={result.Cancelled} error={result.Error ?? "<none>"}");
-            if (result.Error is not null) { _preview.ViewModel.Status = result.Error; return; }
+            if (result.Error is not null) { _preview.ViewModel.ErrorMessage = result.Error; return; }
             if (result.RequestedCount > 0)
             {
                 if (_hoverPreviewActive) CloseHoverPreview();
@@ -657,7 +665,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            _preview.ViewModel.Status = exception is FileNotFoundException or DirectoryNotFoundException
+            _preview.ViewModel.ErrorMessage = exception is FileNotFoundException or DirectoryNotFoundException
                 ? "This item is no longer available."
                 : "Windows could not open the selected item.";
         }

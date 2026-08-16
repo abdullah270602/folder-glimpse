@@ -52,7 +52,7 @@ access signing credentials or publish a GitHub Release.
 After committing the reviewed release preparation, create a signed annotated tag locally:
 
 ```powershell
-$version = '0.1.0-beta.2'
+$version = '0.1.0-beta.3'
 git tag -s "v$version" -m "FolderGlimpse v$version"
 git tag -v "v$version"
 ```
